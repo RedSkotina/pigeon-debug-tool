@@ -1,15 +1,18 @@
 package main
 
 import (
+	"bytes"
+	"flag"
+	"log"
+	"net"
+	"net/http"
+	"os/exec"
+	"runtime"
+	"strings"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/olahol/melody"
-    "flag"
-    "net"
-	"net/http"
-    "log"
-    "time"
-    "runtime"
-    "os/exec"
 )
 
 var (
@@ -25,15 +28,29 @@ func main() {
 		http.ServeFile(c.Writer, c.Request, "views/index.html")
 	})
 
+	r.GET("/mini.css", func(c *gin.Context) {
+		http.ServeFile(c.Writer, c.Request, "views/mini.css")
+	})
+
 	r.GET("/ws", func(c *gin.Context) {
 		m.HandleRequest(c.Writer, c.Request)
 	})
 
 	m.HandleMessage(func(s *melody.Session, msg []byte) {
-		m.Broadcast(msg)
+		pigeon := exec.Command("pigeon")
+		pigeon.Stdin = strings.NewReader(string(msg))
+
+		var out, stderr bytes.Buffer
+		pigeon.Stdout = &out
+		pigeon.Stderr = &stderr
+		err := pigeon.Run()
+		if err != nil {
+			log.Printf("STDERR: %v", stderr.String())
+		}
+		m.Broadcast([]byte(out.String()))
 	})
-    httpAddr := getHTTPAddr()
-    go func() {
+	httpAddr := getHTTPAddr()
+	go func() {
 		url := "http://" + httpAddr
 		if waitServer(url) && *openBrowser && startBrowser(url) {
 			log.Printf("A browser window should open. If not, please visit %s", url)
@@ -41,15 +58,13 @@ func main() {
 			log.Printf("Please open your web browser and visit %s", url)
 		}
 	}()
-    
+
 	r.Run(httpAddr)
-    
-    
-    
+
 }
 
 func getHTTPAddr() string {
-    host, port, err := net.SplitHostPort(*httpListen)
+	host, port, err := net.SplitHostPort(*httpListen)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -60,7 +75,7 @@ func getHTTPAddr() string {
 		log.Print(localhostWarning)
 	}
 	httpAddr := host + ":" + port
-    return httpAddr
+	return httpAddr
 }
 
 const localhostWarning = `
@@ -71,6 +86,7 @@ to this machine as the user running gotour.
 If you don't understand this message, hit Control-C to terminate this process.
 WARNING!  WARNING!  WARNING!
 `
+
 // waitServer waits some time for the http Server to start
 // serving url. The return value reports whether it starts.
 func waitServer(url string) bool {
@@ -86,6 +102,7 @@ func waitServer(url string) bool {
 	}
 	return false
 }
+
 // startBrowser tries to open the URL in a browser, and returns
 // whether it succeed.
 func startBrowser(url string) bool {

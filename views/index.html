@@ -4,44 +4,35 @@
   
   <body class="box_overflow_fix light default">
 
-    <div id="regex_editor" class="box_overflow_fix">
+    <div id="grammar_editor" class="box_overflow_fix">
 		
 		<div id="main_editor" class="flex-container box_overflow_fix">
-			<div id="regex_container" class="flex-regex box_overflow_fix">
-				<label for="regex">
+		
+			<div id="grammar_container" class="flex-grammar box_overflow_fix">
+				<label for="grammar">
 					PEG Grammar
-					<div id="version_container" style="display: none;">
-						—
-						<select id="version_selector">
-													</select>
-											</div>
 					<span id="result_indicator" class="no_match">no match</span>
 				</label>
 
-				<div id="regex_input" class="box_overflow_fix richtext_parent">
-					
-					<div class="richtext_right">
-						
-					</div>
-					<div class="richtext_padding">
-						<div class="richtext_container" id="richtext_regex_container">
-							<div class="richtext" id="richtext_regex">
+				<div id="grammar_input" class="box_overflow_fix richtext_parent">
+						<div class="richtext_container" id="richtext_grammar_container">
+							<div class="richtext" id="richtext_grammar">
 								<pre><span class="colorizer_height"> </span><br></pre>
-								<pre id="regex_colors"><span><div class="caret" style="visibility: hidden;">&nbsp;</div></span><br></pre>
-								<textarea data-focus="#richtext_regex_container" spellcheck="false" id="regex" name="regex" tabindex="1" rows="1" cols="50" placeholder="insert your peg grammar here" autofocus="autofocus" wrap="true"></textarea>
+								<pre id="grammar_colors"><span><div class="caret" style="visibility: hidden;">&nbsp;</div></span><br></pre>
+								<textarea data-focus="#richtext_grammar_container" spellcheck="false" id="grammar" name="grammar" tabindex="1" rows="1" cols="50" placeholder="insert your peg grammar here" autofocus="autofocus" wrap="true"></textarea>
 							</div>
 						</div>
-					</div>
 				</div>
+		
 			</div>
 
 			<div id="test_result_container" class="box_overflow_fix flex-text subst_enabled">
-				<label for="regex_string">Test string</label>
+				<label for="test_string">Test string</label>
 				<div class="overflow_handler flex-grow">
 					<div class="richtext" id="richtext_test">
 						<pre><span id="richtext_test_size"></span><br>&nbsp;</pre>
 						<pre id="richtext_test_colors"><span id="test_color_element"></span><br></pre>
-						<textarea wrap="true" data-focus="#test_result_container .overflow_handler" spellcheck="false" id="regex_string" class="box_overflow_fix" name="test" rows="10" tabindex="3" placeholder="insert your test string here"></textarea>
+						<textarea wrap="true" data-focus="#test_result_container .overflow_handler" spellcheck="false" id="test_string" class="box_overflow_fix" name="test" rows="10" tabindex="3" placeholder="insert your test string here"></textarea>
 					</div>
 				</div>
 			</div>
@@ -82,22 +73,20 @@
       var url = "ws://" + window.location.host + "/ws";
       var ws = new WebSocket(url);
       var name = "Guest" + Math.floor(Math.random() * 1000);
-      var chat = document.getElementById("chat");
-      var text = document.getElementById("text");
+      var test_string_textarea = document.getElementById("test_string");
+      var grammar_textarea = document.getElementById("grammar");
       var now = function () {
         var iso = new Date().toISOString();
         return iso.split("T")[1].split(".")[0];
       };
+
       ws.onmessage = function (msg) {
-        var line =  now() + " " + msg.data + "\n";
-        chat.innerText += line;
+        test_string_textarea.innerText = msg.data;
       };
-      text.onkeydown = function (e) {
-        if (e.keyCode === 13 && text.value !== "") {
-          ws.send("<" + name + "> " + text.value);
-          text.value = "";
-        }
+      grammar_textarea.onchange = function (e) {
+        ws.send(grammar_textarea.value);
       };
+
     </script>
   </body>
 </html>

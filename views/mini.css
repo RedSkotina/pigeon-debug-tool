@@ -1,8 +1,8 @@
-body.light.default #regex_colors .caret {
+body.light.default #grammar_colors .caret {
   border-color: #282828;
 }
 
-body.light.default_light #regex_colors .caret {
+body.light.default_light #grammar_colors .caret {
   border-color: #282828;
 }
 
@@ -11,7 +11,7 @@ body.light {
   background: #ebebeb;
 }
 
-body.light #richtext_regex_container,body.light #test_result_container .overflow_handler {
+body.light #richtext_grammar_container,body.light #test_result_container .overflow_handler {
   background: #fff;
   color: #282828;
   border: 1px solid #afafaf;
@@ -61,7 +61,7 @@ body.light input,body.light textarea {
   border: 1px solid #afafaf;
 }
 
-body.light #richtext_regex_container,body.light #test_result_container .overflow_handler,body.light input:not([data-focus]),body.light textarea:not([data-focus]) {
+body.light #richtext_grammar_container,body.light #test_result_container .overflow_handler,body.light input:not([data-focus]),body.light textarea:not([data-focus]) {
   -moz-box-shadow: inset 0 1px 2px rgba(0,0,0,.1);
   -webkit-box-shadow: inset 0 1px 2px rgba(0,0,0,.1);
   box-shadow: inset 0 1px 2px rgba(0,0,0,.1);
@@ -248,7 +248,7 @@ body.light ::-webkit-scrollbar-thumb:horizontal:active,body.light ::-webkit-scro
   cursor: pointer;
 }
 
-#regex_colors .caret {
+#grammar_colors .caret {
   border-left: 1px solid transparent;
   overflow: hidden;
   display: inline;
@@ -260,21 +260,21 @@ body.light ::-webkit-scrollbar-thumb:horizontal:active,body.light ::-webkit-scro
   white-space: pre-wrap;
 }
 
-#regex_container #version_container {
+#grammar_container #version_container {
   display: inline-block;
 }
 
-#regex_container #version_container span {
+#grammar_container #version_container span {
   font-size: 10px;
   margin-left: 1px;
 }
 
-#regex_container #version_selector {
+#grammar_container #version_selector {
   vertical-align: text-bottom;
   width: 110px;
 }
 
-#regex_container #result_indicator {
+#grammar_container #result_indicator {
   float: right;
   padding: 0 10px;
   font-weight: 400;
@@ -286,38 +286,38 @@ body.light ::-webkit-scrollbar-thumb:horizontal:active,body.light ::-webkit-scro
   margin: 3px 1px 0 0;
 }
 
-#regex_container #regex_input {
+#grammar_container #grammar_input {
   margin-bottom: 10px;
 }
 
-#regex_container #regex_input .richtext_padding {
+#grammar_container #grammar_input .richtext_padding {
   padding: 0 120px 0 20px;
 }
 
-#regex_container #regex_input .richtext_right {
+#grammar_container #grammar_input .richtext_right {
   float: right;
   width: 150px;
 }
 
-#regex_container #regex_input #richtext_regex_container {
+#grammar_container #grammar_input #richtext_grammar_container {
   overflow-y: auto;
   max-height: 170px;
 }
 
 @media only screen and (min-height:700px) {
-  #regex_container #regex_input #richtext_regex_container {
+  #grammar_container #grammar_input #richtext_grammar_container {
     max-height: 250px;
   }
 }
 
 @media only screen and (min-height:850px) {
-  #regex_container #regex_input #richtext_regex_container {
+  #grammar_container #grammar_input #richtext_grammar_container {
     max-height: 350px;
   }
 }
 
 @media only screen and (min-height:1000px) {
-  #regex_container #regex_input #richtext_regex_container {
+  #grammar_container #grammar_input #richtext_grammar_container {
     max-height: 450px;
   }
 }
@@ -373,7 +373,7 @@ body.light ::-webkit-scrollbar-thumb:horizontal:active,body.light ::-webkit-scro
   width: 100%;
 }
 
-.flex-elem,.flex-regex,.flex-text {
+.flex-elem,.flex-grammar,.flex-text {
   -webkit-box-ordinal-group: 1;
   -moz-box-ordinal-group: 1;
   -webkit-order: 0;
@@ -391,7 +391,7 @@ body.light ::-webkit-scrollbar-thumb:horizontal:active,body.light ::-webkit-scro
   align-self: flex-start;
 }
 
-.flex-regex {
+.flex-grammar {
   -webkit-box-flex: 0;
   -moz-box-flex: 0;
   -webkit-flex: 0 0 auto;
@@ -429,23 +429,23 @@ body.light ::-webkit-scrollbar-thumb:horizontal:active,body.light ::-webkit-scro
   display: block !important;
 }
 
-#regex_editor {
+#grammar_editor {
   height: 100%;
   width: 100%;
 }
 
-#regex_editor #main_editor {
+#grammar_editor #main_editor {
   width: 60%;
   float: left;
   padding: 10px;
 }
 
-#richtext_regex_container,#test_result_container .overflow_handler {
+#richtext_grammar_container,#test_result_container .overflow_handler {
   font-size: 0;
 }
 
-#regex,#richtext_test_colors,#richtext_test_size,.colorizer_height {
-  color: transparent;
+#grammar,#richtext_test_colors,#richtext_test_size,.colorizer_height {
+  color: black;
 }
 
 .richtext_container {
@@ -464,7 +464,7 @@ body.light ::-webkit-scrollbar-thumb:horizontal:active,body.light ::-webkit-scro
   overflow: hidden;
 }
 
-.richtext #regex_colors,.richtext #richtext_test_colors {
+.richtext #grammar_colors,.richtext #richtext_test_colors {
   position: absolute;
   top: 0;
   min-height: 50px;
@@ -484,7 +484,7 @@ body.light ::-webkit-scrollbar-thumb:horizontal:active,body.light ::-webkit-scro
   width: 100% !important;
   font-weight: 400 !important;
   font-style: normal !important;
-  overflow: hidden !important;
+  overflow: scroll !important;
 }
 
 .richtext textarea {
@@ -662,7 +662,7 @@ select {
   font-family: Monaco,Consolas,'Lucida Console',monospace;
 }
 
-#regex,.box_overflow_fix,.label_parent,.richtext,.richtext pre,.richtext textarea,.richtext_container {
+#grammar,.box_overflow_fix,.label_parent,.richtext,.richtext pre,.richtext textarea,.richtext_container {
   -webkit-box-sizing: border-box !important;
   -moz-box-sizing: border-box !important;
   -ms-box-sizing: border-box !important;
