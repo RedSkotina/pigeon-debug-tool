@@ -1,0 +1,93 @@
+{
+package main
+
+func main() {
+	got, err := ParseReader("stdin", os.Stdin)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(got)
+} 
+
+func toIfaceSlice(v interface{}) []interface{} {
+	if v == nil {
+		return nil
+	}
+	return v.([]interface{})
+}
+func IfaceSliceToString(v []interface{}) string {
+    if v == nil {
+        return ""
+    }
+    buffer := bytes.Buffer{}
+    for i := range v {
+        buffer.WriteString(string(toIfaceSlice(v[i])[1].([]uint8)))
+    }
+    return buffer.String()
+}
+
+
+type tposition struct {
+    line,col,pos int 
+}
+type tcursor struct {
+    codepoint int 
+}
+
+type tparse struct {
+    pos tposition
+    text string
+    cursor int
+    dir string
+}
+
+type tmatch struct {
+    pos tposition
+    text string
+    cursor int
+}
+
+type trestore struct {
+    pos tposition
+    cursor int
+    dir string
+}
+
+type traceentry struct {
+    value tparse
+    calls []interface{}
+    match *tmatch
+}
+
+func toMatchRef(m interface{}) *tmatch {
+    if m == nil {
+        return nil
+    }
+    r := m.(tmatch)
+    return &r
+}
+
+}
+
+Trace <- (TraceLine)*
+TraceLine <- TraceEntry
+TraceEntry <- enter:EnterParseEntry calls:(TraceEntry / RestoreEntry)* match:MatchEntry? ExitParseEntry 
+    { return traceentry{enter.(tparse), calls.([]interface{}), toMatchRef(match)}, nil }
+EnterParseEntry <- _* '>' _ pos:Position _ "parse" text:(!Cursor .)* cur:Cursor NL
+    { return tparse{pos.(tposition), IfaceSliceToString(toIfaceSlice(text)), cur.(int), ">"}, nil }
+ExitParseEntry  <- _* '<' _ pos:Position _ "parse" text:(!Cursor .)* cur:Cursor NL
+    { return tparse{pos.(tposition), IfaceSliceToString(toIfaceSlice(text)), cur.(int), "<"}, nil }
+RestoreEntry <- enter:EnterRestoreEntry exit:ExitRestoreEntry { return []trestore{enter.(trestore),exit.(trestore)}, nil }
+EnterRestoreEntry    <- _* '>' _ pos:Position _ "restore" _ cur:Cursor NL
+    { return trestore{pos.(tposition), cur.(int), ">" }, nil }
+ExitRestoreEntry     <- _* '<' _ pos:Position _ "restore" _ cur:Cursor NL
+    { return trestore{pos.(tposition), cur.(int), "<" }, nil }
+MatchEntry <- _* "MATCH" _ pos:Position _ text:(!Cursor .)* cur:Cursor NL
+    { return tmatch{pos.(tposition), IfaceSliceToString(toIfaceSlice(text)), cur.(int)}, nil }
+
+Cursor <- "[U+" n:HexNumber _ "'" . "']" { return n, nil }
+Position <- line:Number ':' col:Number ':' pos:Number ':' { return tposition{line.(int),col.(int),pos.(int)}, nil }
+Number <- [0-9]+ { n,err := strconv.ParseInt(string(c.text), 0, 64); return int(n),err }
+HexNumber <- [0-9A-F]+ { n,err := strconv.ParseInt(string(c.text), 16, 64); return int(n),err }
+NL <- "\r"? "\n" { return "", nil }
+_ "whitespace" <- ' '

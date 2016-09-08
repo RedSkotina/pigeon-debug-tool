@@ -10,7 +10,12 @@ import (
 	"runtime"
 	"strings"
 	"time"
-
+	"io/ioutil"
+	"os"
+	"math/rand"
+	"path/filepath"
+	"encoding/hex"
+	"encoding/json"
 	"github.com/gin-gonic/gin"
 	"github.com/olahol/melody"
 )
@@ -36,18 +41,14 @@ func main() {
 		m.HandleRequest(c.Writer, c.Request)
 	})
 
-	m.HandleMessage(func(s *melody.Session, msg []byte) {
-		pigeon := exec.Command("pigeon")
-		pigeon.Stdin = strings.NewReader(string(msg))
-
-		var out, stderr bytes.Buffer
-		pigeon.Stdout = &out
-		pigeon.Stderr = &stderr
-		err := pigeon.Run()
-		if err != nil {
-			log.Printf("STDERR: %v", stderr.String())
+	m.HandleMessage(func(s *melody.Session, bmsg []byte) {
+		var msg Msg
+		if err := json.Unmarshal(bmsg, &msg); err != nil {
+			log.Printf("json.Unmarshall: %v", err)
 		}
-		m.Broadcast([]byte(out.String()))
+		parser := generateParser(msg.Grammar)
+		out := compileAndRunGoSource(parser, msg.TestString)
+		m.Broadcast(out.Bytes())
 	})
 	httpAddr := getHTTPAddr()
 	go func() {
@@ -61,6 +62,74 @@ func main() {
 
 	r.Run(httpAddr)
 
+}
+
+// Msg for communicating with frontend
+type Msg struct {
+    Grammar string `json:"grammar"`
+    TestString string `json:"test_string"`
+}
+
+func generateParser(msg string) bytes.Buffer {
+	pigeon := exec.Command("pigeon")
+	pigeon.Stdin = strings.NewReader(msg)
+
+	var pigout, pigerr bytes.Buffer
+	pigeon.Stdout = &pigout
+	pigeon.Stderr = &pigerr
+	err := pigeon.Run()
+	if err != nil {
+		log.Printf("PIGEON STDERR: %v", pigerr.String())
+	}
+	var t bytes.Buffer
+	t.WriteString(mainFunc + pigout.String())
+	goimports := exec.Command("goimports")
+	goimports.Stdin = strings.NewReader(t.String())
+	var impout, imperr bytes.Buffer
+	goimports.Stdout = &impout
+	goimports.Stderr = &imperr
+	err = goimports.Run()
+	if err != nil {
+		log.Printf("GOIMPORTS STDERR: %v", imperr.String())
+	}
+	return impout
+}
+
+const mainFunc = `
+func main() {
+	_, err := ParseReader("stdin", os.Stdin, Debug(true))
+	if err != nil {
+		log.Fatal(err)
+	}
+	//fmt.Println(got)
+}
+`
+
+func compileAndRunGoSource(source bytes.Buffer, test string) bytes.Buffer {
+	tmpfilename := TempFileName("pigeon",".go")
+	err := ioutil.WriteFile(tmpfilename,source.Bytes(),0644)
+	defer os.Remove(tmpfilename)
+	
+	log.Printf("go run %v", tmpfilename)
+	gorun := exec.Command("go","run", tmpfilename)
+	gorun.Stdin = strings.NewReader(test)
+
+	var out, stderr bytes.Buffer
+	gorun.Stdout = &out
+	gorun.Stderr = &stderr
+	err = gorun.Run()
+	if err != nil {
+		//log.Printf("GORUN STDERR: %v", stderr.String())
+		out.Write(stderr.Bytes())
+	}
+	return out
+}
+
+//TempFileName generates a temporary filename for use in testing or whatever
+func TempFileName(prefix, suffix string) string {
+    randBytes := make([]byte, 16)
+    rand.Read(randBytes)
+    return filepath.Join(os.TempDir(), prefix+hex.EncodeToString(randBytes)+suffix)
 }
 
 func getHTTPAddr() string {
@@ -86,6 +155,7 @@ to this machine as the user running gotour.
 If you don't understand this message, hit Control-C to terminate this process.
 WARNING!  WARNING!  WARNING!
 `
+
 
 // waitServer waits some time for the http Server to start
 // serving url. The return value reports whether it starts.
