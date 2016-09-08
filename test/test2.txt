@@ -1,0 +1,2 @@
+ > 1:1:0: parseRule Input [U+0061 'a']
+< 8:1:77: parseRule Input [U+FFFD '�']

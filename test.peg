@@ -1,0 +1,14 @@
+{
+package main
+
+func main() {
+	_, err := ParseReader("stdin", os.Stdin,Debug(true))
+	if err != nil {
+		log.Fatal(err)
+	}
+} 
+
+
+}
+
+Test <- "[" s:. "]" { fmt.Println(string(c.text)); return "",nil}

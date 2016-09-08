@@ -2,7 +2,7 @@
 package main
 
 func main() {
-	got, err := ParseReader("stdin", os.Stdin)
+	got, err := ParseReader("stdin", os.Stdin,Debug(true))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -64,14 +64,15 @@ func toMatchRef(m interface{}) *tmatch {
         return nil
     }
     r := m.(tmatch)
+    fmt.Println(r.pos.pos);
     return &r
 }
 
 }
 
-Trace <- (TraceLine)*
-TraceLine <- TraceEntry
-TraceEntry <- enter:EnterParseEntry calls:(TraceEntry / RestoreEntry)* match:MatchEntry? ExitParseEntry 
+Trace <- #{state["indent"]=1; return nil} (TraceLine)*
+TraceLine <- INDENTATION TraceEntry  
+TraceEntry <-  INDENT enter:EnterParseEntry calls:(TraceEntry / RestoreEntry)* match:MatchEntry? DEDENT ExitParseEntry 
     { return traceentry{enter.(tparse), calls.([]interface{}), toMatchRef(match)}, nil }
 EnterParseEntry <- _* '>' _ pos:Position _ "parse" text:(!Cursor .)* cur:Cursor NL
     { return tparse{pos.(tposition), IfaceSliceToString(toIfaceSlice(text)), cur.(int), ">"}, nil }
@@ -91,3 +92,8 @@ Number <- [0-9]+ { n,err := strconv.ParseInt(string(c.text), 0, 64); return int(
 HexNumber <- [0-9A-F]+ { n,err := strconv.ParseInt(string(c.text), 16, 64); return int(n),err }
 NL <- "\r"? "\n" { return "", nil }
 _ "whitespace" <- ' '
+
+
+INDENTATION ← spaces:" "* &{ fmt.Println(len(toIfaceSlice(spaces)),state["indent"]);return len(toIfaceSlice(spaces)) == state["indent"].(int), nil }
+INDENT <- #{state["indent"]=state["indent"].(int)+1; return nil}
+DEDENT <- #{state["indent"]=state["indent"].(int)-1; return nil}
