@@ -48,7 +48,8 @@ func main() {
 		}
 		parser := generateParser(msg.Grammar)
 		out := compileAndRunGoSource(parser, msg.TestString)
-		m.Broadcast(out.Bytes())
+		jtrace := buildJsonTrace(out)
+		m.Broadcast(jtrace)
 	})
 	httpAddr := getHTTPAddr()
 	go func() {
@@ -132,6 +133,23 @@ func TempFileName(prefix, suffix string) string {
     return filepath.Join(os.TempDir(), prefix+hex.EncodeToString(randBytes)+suffix)
 }
 
+func buildJsonTrace(trace bytes.Buffer) []byte {
+	qtrace := strings.Replace(trace.String(), "\ufffd", "?", -1)
+	trace.Reset()
+	trace.WriteString(qtrace)
+	log.Printf("%v\n",trace.String())
+	got, err := ParseReader("", &trace)
+	if err != nil {
+		log.Fatal(err)
+	}
+	strace := got.(Ttrace)
+	log.Printf("%v\n",strace)
+	jtrace, err := json.Marshal(strace)
+	if err != nil {
+		log.Printf("Cant marshal json\n")
+	}
+	return jtrace
+}
 func getHTTPAddr() string {
 	host, port, err := net.SplitHostPort(*httpListen)
 	if err != nil {
