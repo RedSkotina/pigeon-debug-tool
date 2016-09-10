@@ -1,95 +1,100 @@
 <html>
-  
-  <link href="grammar.css" rel="stylesheet" type="text/css">
   <script src="codemirror/lib/codemirror.js"></script>
   <link rel="stylesheet" href="codemirror/lib/codemirror.css">
   <script src="codemirror/mode/pegjs/pegjs.js"></script>
+  <script src="jquery-3.1.0.min.js"></script>
+  <script src="tether.min.js"></script>
+  <!-- Latest compiled and minified CSS -->
+  <link rel="stylesheet" href="bootstrap/3.3.7/css/bootstrap.min.css">
+  <!-- Optional theme -->
+  <link rel="stylesheet" href="bootstrap/3.3.7/css/bootstrap-theme.min.css">
+  <!-- Latest compiled and minified JavaScript -->
+  <script src="bootstrap/3.3.7/js/bootstrap.min.js"></script>
 
+  <link href="app.css" rel="stylesheet" type="text/css">
+  
   <body>
-
-    <div id="grammar_editor">
-		
-		<div id="main_editor" class="flex-container">
-		
-			<div id="grammar_container" class="flex-grammar">
-                <label for="grammar_input">PEG Grammar
-					<span id="result_indicator" class="no_match">no match</span>
-				</label>
-				<div id="grammar_input">
-						<div class="richtext_container overflow_handler" id="richtext_grammar_container">
-							<div class="richtext" id="richtext_grammar">
-							</div>
-						</div>
-				</div>
-			</div>
-
-			<div id="test_result_container" class="flex-text">
-				<label for="test_input">Test string</label>
-				<div id="test_input" class="overflow_handler richtext_container">
-					<div class="richtext" id="richtext_test">
-					</div>
-				</div>
-			</div>
-		
-		</div>
+    
+    <div id="desk">
+        
+        <div id="main_desk" class="flex-container">
+            <div id="grammar_container" class="flex-grammar">
+                <label for="richtext_grammar_container">PEG Grammar
+                    <span id="result_indicator" class="no_match">no match</span>
+                </label>
+                <div id="richtext_grammar_container" class="richtext_container overflow_handler">
+                    <div id="richtext_grammar" class="richtext"></div>
+                </div>
+            </div>
+            <div id="test_container" class="flex-text">
+                <label for="richtext_test_container">Test string</label>
+                <div id="richtext_test_container" class="richtext_container overflow_handler">
+                    <div id="richtext_test" class="richtext"></div>
+                </div>
+            </div>
+        </div>
 
 
-		<div id="regex_treeview">
-			<div id="treeview_content" class="flex-container">
-                <div id="scroll_match" class="flex-elem">
-                    <label for="test_string">Match information</label>
-                    <div class="overflow_handler flex-grow">
-                        <div id="match_info">Detailed match information will be displayed here automatically.</div>
+        <div id="info_desk" class="flex-container">
+                <div id="output_container" class="flex-elem">
+                    <label for="richtext_output_container">Output</label>
+                    <div id="richtext_output_container" class="overflow_handler">
+                        <div id="richtext_output" class="richtext">Output will be displayed here automatically.</div>
                     </div>
                 </div>
-			</div>
-		</div>
-
-	
-	</div>
+        </div>
+    
+    </div>
         
     <script>
-      var url = "ws://" + window.location.host + "/ws";
-      var ws = new WebSocket(url);
-      var name = "Guest" + Math.floor(Math.random() * 1000);
-      var test_string_textarea = document.getElementById("test_string");
-			var match_info = document.getElementById("match_info");
-			var grammar_textarea = document.getElementById("grammar");
+    //var url = "ws://" + window.location.host + "/ws";
+    //var ws = new WebSocket(url);
+    var name = "Guest" + Math.floor(Math.random() * 1000);
+    var test_string_textarea = document.getElementById("test_string");
+    var output = document.getElementById("richtext_output");
+    var grammar_textarea = document.getElementById("grammar");
 
-			var cm1 = CodeMirror(document.getElementById("richtext_grammar"), {
-  			value: "function myScript(){return 100;}\n",
-  			mode:  "pegjs"
-			});
-            var cm2 = CodeMirror(document.getElementById("richtext_test"), {
-  			value: "function myScript(){return 100;}\n",
-  			mode:  "pegjs"
-			});
+    var cm_grammar = CodeMirror(document.getElementById("richtext_grammar"), {
+    value: "function myScript(){return 100;}\n",
+    mode:  "pegjs",
+    lineNumbers: true
+    });
+    cm_grammar.setSize("100%", "100%");
+    var cm_test = CodeMirror(document.getElementById("richtext_test"), {
+    value: "test string is here\n",
+    mode:  "pegjs",
+    smartIndent: false,
+    electricChars: false,
+    });
+    cm_test.setSize("100%", "100%");
+    
 
-			var textMarker;
-			textMarker = cm.markText({
-        line: 1,
-        ch: 2
+    var textMarker;
+    textMarker = cm_test.markText({
+        line: 0,
+        ch: 0
     }, {
-        line: 1,
-        ch: 10
+        line: 0,
+        ch: 4
     }, {
-        className: 'marked-text'
+        className: 'marked-text',
+        //css: "color: #fe3"
     });
     
     $('.marked-text').tooltip({
         title: 'This is a return statement',
         container: 'body',
-        delay: { "show": 500, "hide": 100 },
+        delay: { "show": 300, "hide": 200 },
         animation: false
     });
 
-      ws.onmessage = function (msg) {
-        match_info.innerText = msg.data;
-      };
-      grammar_textarea.onchange = function (e) {
-				jmsg = JSON.stringify({ grammar: grammar_textarea.value, test_string: test_string_textarea.value })
-        ws.send(jmsg);
-      };
+    //ws.onmessage = function (msg) {
+    //	output.innerText = msg.data;
+    //};
+    cm_grammar.onchange = function (e) {
+            jmsg = JSON.stringify({ grammar: cm_grammar.getDoc().getValue(), test_string: cm_test.getDoc().getValue() })
+            //ws.send(jmsg);
+    };
 
     </script>
   </body>

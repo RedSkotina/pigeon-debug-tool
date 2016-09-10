@@ -34,8 +34,8 @@ func main() {
 		http.ServeFile(c.Writer, c.Request, "views/index.html")
 	})
 
-	r.GET("/mini.css", func(c *gin.Context) {
-		http.ServeFile(c.Writer, c.Request, "views/mini.css")
+	r.GET("/app.css", func(c *gin.Context) {
+		http.ServeFile(c.Writer, c.Request, "views/app.css")
 	})
 	r.GET("codemirror/lib/codemirror.js", func(c *gin.Context) {
 		http.ServeFile(c.Writer, c.Request, "views/codemirror/lib/codemirror.js")
@@ -46,6 +46,28 @@ func main() {
 	r.GET("codemirror/mode/pegjs/pegjs.js", func(c *gin.Context) {
 		http.ServeFile(c.Writer, c.Request, "views/codemirror/lib/codemirror.js")
 	})
+    r.GET("bootstrap/3.3.7/css/bootstrap.min.css", func(c *gin.Context) {
+		http.ServeFile(c.Writer, c.Request, "views/bootstrap/3.3.7/css/bootstrap.min.css")
+	})
+    r.GET("bootstrap/3.3.7/css/bootstrap-theme.min.css", func(c *gin.Context) {
+		http.ServeFile(c.Writer, c.Request, "views/bootstrap/3.3.7/css/bootstrap-theme.min.css")
+	})
+    r.GET("bootstrap/3.3.7/js/bootstrap.min.js", func(c *gin.Context) {
+		http.ServeFile(c.Writer, c.Request, "views/bootstrap/3.3.7/js/bootstrap.min.js")
+	})
+    r.GET("bootstrap/3.3.7/css/bootstrap.min.css.map", func(c *gin.Context) {
+		http.ServeFile(c.Writer, c.Request, "views/bootstrap/3.3.7/css/bootstrap.min.css.map")
+	})
+    r.GET("bootstrap/3.3.7/css/bootstrap-theme.min.css.map", func(c *gin.Context) {
+		http.ServeFile(c.Writer, c.Request, "views/bootstrap/3.3.7/css/bootstrap-theme.min.css.map")
+	})
+    r.GET("tether.min.js", func(c *gin.Context) {
+		http.ServeFile(c.Writer, c.Request, "views/tether.min.js")
+	})
+    r.GET("jquery-3.1.0.min.js", func(c *gin.Context) {
+		http.ServeFile(c.Writer, c.Request, "views/jquery-3.1.0.min.js")
+	})
+    
 	r.GET("/ws", func(c *gin.Context) {
 		m.HandleRequest(c.Writer, c.Request)
 	})
