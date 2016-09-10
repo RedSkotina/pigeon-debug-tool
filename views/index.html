@@ -1,38 +1,32 @@
 <html>
   
-  <link href="mini.css" rel="stylesheet" type="text/css">
-  
-  <body class="box_overflow_fix light default">
+  <link href="grammar.css" rel="stylesheet" type="text/css">
+  <script src="codemirror/lib/codemirror.js"></script>
+  <link rel="stylesheet" href="codemirror/lib/codemirror.css">
+  <script src="codemirror/mode/pegjs/pegjs.js"></script>
 
-    <div id="grammar_editor" class="box_overflow_fix">
+  <body>
+
+    <div id="grammar_editor">
 		
-		<div id="main_editor" class="flex-container box_overflow_fix">
+		<div id="main_editor" class="flex-container">
 		
-			<div id="grammar_container" class="flex-grammar box_overflow_fix">
-				<label for="grammar">
-					PEG Grammar
+			<div id="grammar_container" class="flex-grammar">
+                <label for="grammar_input">PEG Grammar
 					<span id="result_indicator" class="no_match">no match</span>
 				</label>
-
-				<div id="grammar_input" class="box_overflow_fix richtext_parent">
-						<div class="richtext_container" id="richtext_grammar_container">
+				<div id="grammar_input">
+						<div class="richtext_container overflow_handler" id="richtext_grammar_container">
 							<div class="richtext" id="richtext_grammar">
-								<pre><span class="colorizer_height"> </span><br></pre>
-								<pre id="grammar_colors"><span><div class="caret" style="visibility: hidden;">&nbsp;</div></span><br></pre>
-								<textarea data-focus="#richtext_grammar_container" spellcheck="false" id="grammar" name="grammar" tabindex="1" rows="1" cols="50" placeholder="insert your peg grammar here" autofocus="autofocus" wrap="true"></textarea>
 							</div>
 						</div>
 				</div>
-		
 			</div>
 
-			<div id="test_result_container" class="box_overflow_fix flex-text subst_enabled">
-				<label for="test_string">Test string</label>
-				<div class="overflow_handler flex-grow">
+			<div id="test_result_container" class="flex-text">
+				<label for="test_input">Test string</label>
+				<div id="test_input" class="overflow_handler richtext_container">
 					<div class="richtext" id="richtext_test">
-						<pre><span id="richtext_test_size"></span><br>&nbsp;</pre>
-						<pre id="richtext_test_colors"><span id="test_color_element"></span><br></pre>
-						<textarea wrap="true" data-focus="#test_result_container .overflow_handler" spellcheck="false" id="test_string" class="box_overflow_fix" name="test" rows="10" tabindex="3" placeholder="insert your test string here"></textarea>
 					</div>
 				</div>
 			</div>
@@ -40,19 +34,14 @@
 		</div>
 
 
-		<div id="regex_treeview" class="box_overflow_fix">
-			<div id="treeview_content" class="box_overflow_fix flex-container">
-			
-			<div id="scroll_match" class="box_overflow_fix flex-elem">
-
-				<div id="match_label" class="label expander">
-					<span class="fa fa-minus-circle"></span>Match information
-				</div>
-				<div class="overflow_handler box_overflow_fix flex-grow">
-					<div id="match_info">Detailed match information will be displayed here automatically.</div>
-				</div>
-
-			</div>
+		<div id="regex_treeview">
+			<div id="treeview_content" class="flex-container">
+                <div id="scroll_match" class="flex-elem">
+                    <label for="test_string">Match information</label>
+                    <div class="overflow_handler flex-grow">
+                        <div id="match_info">Detailed match information will be displayed here automatically.</div>
+                    </div>
+                </div>
 			</div>
 		</div>
 
@@ -66,10 +55,33 @@
       var test_string_textarea = document.getElementById("test_string");
 			var match_info = document.getElementById("match_info");
 			var grammar_textarea = document.getElementById("grammar");
-      var now = function () {
-        var iso = new Date().toISOString();
-        return iso.split("T")[1].split(".")[0];
-      };
+
+			var cm1 = CodeMirror(document.getElementById("richtext_grammar"), {
+  			value: "function myScript(){return 100;}\n",
+  			mode:  "pegjs"
+			});
+            var cm2 = CodeMirror(document.getElementById("richtext_test"), {
+  			value: "function myScript(){return 100;}\n",
+  			mode:  "pegjs"
+			});
+
+			var textMarker;
+			textMarker = cm.markText({
+        line: 1,
+        ch: 2
+    }, {
+        line: 1,
+        ch: 10
+    }, {
+        className: 'marked-text'
+    });
+    
+    $('.marked-text').tooltip({
+        title: 'This is a return statement',
+        container: 'body',
+        delay: { "show": 500, "hide": 100 },
+        animation: false
+    });
 
       ws.onmessage = function (msg) {
         match_info.innerText = msg.data;

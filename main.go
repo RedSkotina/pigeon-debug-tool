@@ -2,20 +2,21 @@ package main
 
 import (
 	"bytes"
+	"encoding/hex"
+	"encoding/json"
 	"flag"
+	"io/ioutil"
 	"log"
+	"math/rand"
 	"net"
 	"net/http"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
-	"io/ioutil"
-	"os"
-	"math/rand"
-	"path/filepath"
-	"encoding/hex"
-	"encoding/json"
+
 	"github.com/gin-gonic/gin"
 	"github.com/olahol/melody"
 )
@@ -36,7 +37,15 @@ func main() {
 	r.GET("/mini.css", func(c *gin.Context) {
 		http.ServeFile(c.Writer, c.Request, "views/mini.css")
 	})
-
+	r.GET("codemirror/lib/codemirror.js", func(c *gin.Context) {
+		http.ServeFile(c.Writer, c.Request, "views/codemirror/lib/codemirror.js")
+	})
+	r.GET("codemirror/lib/codemirror.css", func(c *gin.Context) {
+		http.ServeFile(c.Writer, c.Request, "views/codemirror/lib/codemirror.js")
+	})
+	r.GET("codemirror/mode/pegjs/pegjs.js", func(c *gin.Context) {
+		http.ServeFile(c.Writer, c.Request, "views/codemirror/lib/codemirror.js")
+	})
 	r.GET("/ws", func(c *gin.Context) {
 		m.HandleRequest(c.Writer, c.Request)
 	})
@@ -67,8 +76,8 @@ func main() {
 
 // Msg for communicating with frontend
 type Msg struct {
-    Grammar string `json:"grammar"`
-    TestString string `json:"test_string"`
+	Grammar    string `json:"grammar"`
+	TestString string `json:"test_string"`
 }
 
 func generateParser(msg string) bytes.Buffer {
@@ -107,12 +116,12 @@ func main() {
 `
 
 func compileAndRunGoSource(source bytes.Buffer, test string) bytes.Buffer {
-	tmpfilename := TempFileName("pigeon",".go")
-	err := ioutil.WriteFile(tmpfilename,source.Bytes(),0644)
+	tmpfilename := TempFileName("pigeon", ".go")
+	err := ioutil.WriteFile(tmpfilename, source.Bytes(), 0644)
 	defer os.Remove(tmpfilename)
-	
+
 	log.Printf("go run %v", tmpfilename)
-	gorun := exec.Command("go","run", tmpfilename)
+	gorun := exec.Command("go", "run", tmpfilename)
 	gorun.Stdin = strings.NewReader(test)
 
 	var out, stderr bytes.Buffer
@@ -128,22 +137,22 @@ func compileAndRunGoSource(source bytes.Buffer, test string) bytes.Buffer {
 
 //TempFileName generates a temporary filename for use in testing or whatever
 func TempFileName(prefix, suffix string) string {
-    randBytes := make([]byte, 16)
-    rand.Read(randBytes)
-    return filepath.Join(os.TempDir(), prefix+hex.EncodeToString(randBytes)+suffix)
+	randBytes := make([]byte, 16)
+	rand.Read(randBytes)
+	return filepath.Join(os.TempDir(), prefix+hex.EncodeToString(randBytes)+suffix)
 }
 
 func buildJsonTrace(trace bytes.Buffer) []byte {
 	qtrace := strings.Replace(trace.String(), "\ufffd", "?", -1)
 	trace.Reset()
 	trace.WriteString(qtrace)
-	log.Printf("%v\n",trace.String())
+	log.Printf("%v\n", trace.String())
 	got, err := ParseReader("", &trace)
 	if err != nil {
 		log.Fatal(err)
 	}
 	strace := got.(Ttrace)
-	log.Printf("%v\n",strace)
+	log.Printf("%v\n", strace)
 	jtrace, err := json.Marshal(strace)
 	if err != nil {
 		log.Printf("Cant marshal json\n")
@@ -173,7 +182,6 @@ to this machine as the user running gotour.
 If you don't understand this message, hit Control-C to terminate this process.
 WARNING!  WARNING!  WARNING!
 `
-
 
 // waitServer waits some time for the http Server to start
 // serving url. The return value reports whether it starts.
