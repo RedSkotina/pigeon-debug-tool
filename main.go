@@ -41,33 +41,33 @@ func main() {
 		http.ServeFile(c.Writer, c.Request, "views/codemirror/lib/codemirror.js")
 	})
 	r.GET("codemirror/lib/codemirror.css", func(c *gin.Context) {
-		http.ServeFile(c.Writer, c.Request, "views/codemirror/lib/codemirror.js")
+		http.ServeFile(c.Writer, c.Request, "views/codemirror/lib/codemirror.css")
 	})
 	r.GET("codemirror/mode/pegjs/pegjs.js", func(c *gin.Context) {
-		http.ServeFile(c.Writer, c.Request, "views/codemirror/lib/codemirror.js")
+		http.ServeFile(c.Writer, c.Request, "views/codemirror/mode/pegjs/pegjs.js")
 	})
-    r.GET("bootstrap/3.3.7/css/bootstrap.min.css", func(c *gin.Context) {
+	r.GET("bootstrap/3.3.7/css/bootstrap.min.css", func(c *gin.Context) {
 		http.ServeFile(c.Writer, c.Request, "views/bootstrap/3.3.7/css/bootstrap.min.css")
 	})
-    r.GET("bootstrap/3.3.7/css/bootstrap-theme.min.css", func(c *gin.Context) {
+	r.GET("bootstrap/3.3.7/css/bootstrap-theme.min.css", func(c *gin.Context) {
 		http.ServeFile(c.Writer, c.Request, "views/bootstrap/3.3.7/css/bootstrap-theme.min.css")
 	})
-    r.GET("bootstrap/3.3.7/js/bootstrap.min.js", func(c *gin.Context) {
+	r.GET("bootstrap/3.3.7/js/bootstrap.min.js", func(c *gin.Context) {
 		http.ServeFile(c.Writer, c.Request, "views/bootstrap/3.3.7/js/bootstrap.min.js")
 	})
-    r.GET("bootstrap/3.3.7/css/bootstrap.min.css.map", func(c *gin.Context) {
+	r.GET("bootstrap/3.3.7/css/bootstrap.min.css.map", func(c *gin.Context) {
 		http.ServeFile(c.Writer, c.Request, "views/bootstrap/3.3.7/css/bootstrap.min.css.map")
 	})
-    r.GET("bootstrap/3.3.7/css/bootstrap-theme.min.css.map", func(c *gin.Context) {
+	r.GET("bootstrap/3.3.7/css/bootstrap-theme.min.css.map", func(c *gin.Context) {
 		http.ServeFile(c.Writer, c.Request, "views/bootstrap/3.3.7/css/bootstrap-theme.min.css.map")
 	})
-    r.GET("tether.min.js", func(c *gin.Context) {
+	r.GET("tether.min.js", func(c *gin.Context) {
 		http.ServeFile(c.Writer, c.Request, "views/tether.min.js")
 	})
-    r.GET("jquery-3.1.0.min.js", func(c *gin.Context) {
+	r.GET("jquery-3.1.0.min.js", func(c *gin.Context) {
 		http.ServeFile(c.Writer, c.Request, "views/jquery-3.1.0.min.js")
 	})
-    
+
 	r.GET("/ws", func(c *gin.Context) {
 		m.HandleRequest(c.Writer, c.Request)
 	})
@@ -174,13 +174,41 @@ func buildJsonTrace(trace bytes.Buffer) []byte {
 		log.Fatal(err)
 	}
 	strace := got.(Ttrace)
-	log.Printf("%v\n", strace)
-	jtrace, err := json.Marshal(strace)
+	ftrace := filterTrace(strace)
+	log.Printf("%v\n", ftrace)
+	jtrace, err := json.Marshal(ftrace)
 	if err != nil {
 		log.Printf("Cant marshal json\n")
 	}
 	return jtrace
 }
+func walkEntry(t Tentry) []Tentry {
+	tr := []Tentry{}
+	ts := []Tentry{}
+	for _, v := range t.Calls {
+		g := walkEntry(v)
+		if len(g) != 0 {
+			ts = append(ts, g...)
+		}
+	}
+	if strings.HasPrefix(t.Detail.Name, "Rule ") {
+		t.Calls = ts
+		tr = append(tr, t)
+	} else {
+		tr = ts
+	}
+	return tr
+}
+func filterTrace(t Ttrace) Ttrace {
+	ts := []Tentry{}
+	for _, v := range t.Entries {
+		g := walkEntry(v)
+		ts = append(ts, g...)
+	}
+
+	return Ttrace{ts}
+}
+
 func getHTTPAddr() string {
 	host, port, err := net.SplitHostPort(*httpListen)
 	if err != nil {

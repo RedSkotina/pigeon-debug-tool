@@ -13,6 +13,7 @@
 
   <link href="app.css" rel="stylesheet" type="text/css">
   
+  
   <body>
     
     <div id="desk">
@@ -47,54 +48,157 @@
     </div>
         
     <script>
-    //var url = "ws://" + window.location.host + "/ws";
-    //var ws = new WebSocket(url);
-    var name = "Guest" + Math.floor(Math.random() * 1000);
-    var test_string_textarea = document.getElementById("test_string");
+    var url = "ws://" + window.location.host + "/ws";
+    var ws = new WebSocket(url);
     var output = document.getElementById("richtext_output");
-    var grammar_textarea = document.getElementById("grammar");
-
+    
     var cm_grammar = CodeMirror(document.getElementById("richtext_grammar"), {
-    value: "function myScript(){return 100;}\n",
-    mode:  "pegjs",
-    lineNumbers: true
+        value: "function myScript(){return 100;}\n",
+        mode:  "pegjs",
+        lineNumbers: true
     });
     cm_grammar.setSize("100%", "100%");
     var cm_test = CodeMirror(document.getElementById("richtext_test"), {
-    value: "test string is here\n",
-    mode:  "pegjs",
-    smartIndent: false,
-    electricChars: false,
+        value: "test string is here\n",
+        mode:  "pegjs",
+        smartIndent: false,
+        electricChars: false,
     });
     cm_test.setSize("100%", "100%");
-    
 
-    var textMarker;
-    textMarker = cm_test.markText({
-        line: 0,
-        ch: 0
-    }, {
-        line: 0,
-        ch: 4
-    }, {
-        className: 'marked-text',
-        //css: "color: #fe3"
-    });
+    var markClassNames = {}
+    // provide pos x1,x2 because no method pos -> {line, ch}
+    function mark(c1, c2, text, x1, x2) {
+        className = 'marked-text'+c1.line+''+c1.ch+''+c2.line+''+c2.ch;
+        /*var markedElem = document.getElementById('.'+className);
+        if (markedElem !== null ) {
+            oldTitle = markedElem.attr('title')
+            markedElem.attr('title', oldTitle + '\n' + text); //update title
+            return;
+        }*/
+        var style = document.createElement('style');
+        style.type = 'text/css';
+        style.innerHTML = '.'+className+' { }\n' + '.' + className + ':hover { border: 1px solid red;}';
+        document.body.appendChild(style);
     
-    $('.marked-text').tooltip({
-        title: 'This is a return statement',
-        container: 'body',
-        delay: { "show": 300, "hide": 200 },
-        animation: false
-    });
+                    
+        var textMarker;
+        textMarker = cm_test.markText({
+            line: c1.line,
+            ch: c1.ch
+        }, {
+            line: c2.line,
+            ch: c2.ch
+        }, {
+            className: className,
+            //css: "color: #fe3"
+        });
+        //console.log(className)
+        if ( !(className in markClassNames) ) {
+            markClassNames[className] = { pos: {x1:x1 ,x2:x2}, text: text};
+        } else {
+            markClassNames[className].text = text + '\n' + markClassNames[className].text;
+        }
+    }
+    
+    function traverse(jsonObj) {
+        if( typeof jsonObj == "object") {
+            $.each(jsonObj, function(k,v) {
+                if ("calls" in v) {
+                    var c2,x2
+                    c1 = cm_test.findPosH({line:0,ch:0}, v.detail.pos.Pos,'char',false);
+                    x1 = v.detail.pos.Pos
+                    if (v.match !== null) {
+                        c2 = cm_test.findPosH({line:0,ch:0}, v.match.pos.Pos,'char',false);
+                        x2 = v.match.pos.Pos;
+                    } else {
+                        c2 = c1;
+                        x2 = x1;
+                    }
+                    
+                    mark(c1, c2, v.detail.name, x1, x2)
+                
+                    traverse(v.calls);
+                }
+            });
+        }
+        else {
+            // jsonOb is a number or string
+        }
+    }
+    var markAllMatches = function(e) {
+        // clear all marks
+        marks = cm_test.getDoc().getAllMarks()
+        marks.forEach(function(item, i, arr) {
+            item.clear();
+        });
+        // clear all marks styles
+        var regex = /^\.marked-text.*/;
+        var elements = document.querySelectorAll('body > style');
+        [].forEach.call(elements, function( el ) {
+            if ( regex.test(el.innerHTML) ) {
+                el.parentNode.removeChild(el);
+            };
+        });
+        
+        markClassNames = {}
 
-    //ws.onmessage = function (msg) {
-    //	output.innerText = msg.data;
-    //};
-    cm_grammar.onchange = function (e) {
-            jmsg = JSON.stringify({ grammar: cm_grammar.getDoc().getValue(), test_string: cm_test.getDoc().getValue() })
-            //ws.send(jmsg);
+        traverse(e);
+
+        // enable tooltips for marked classes
+        // sort objects (workaround bootstrap tooltip bug): first - nested elements according nesting level
+        // object -> array of objects
+        tooltips = []
+        for (var k in markClassNames) {
+            if (markClassNames.hasOwnProperty(k)) {
+                tooltips.push({key:k, value:markClassNames[k]})
+                console.log(k,markClassNames[k]);
+            }
+        }
+        // todo: check when partial intersect?
+        function compare(a,b) {
+            if ( (a.value.pos.x1 >= b.value.pos.x1) && (a.value.pos.x2 <= b.value.pos.x2) )
+                return -1;
+            if ( (a.value.pos.x1 <= b.value.pos.x1) && (a.value.pos.x2 >= b.value.pos.x2) )
+                return 1;
+            return 0;
+        }
+        tooltips = tooltips.sort(compare);
+        // todo: need add text of nested ranges to big ranges
+        tooltips.forEach(function(entry) {
+            console.log(entry);
+            $('.'+entry.key).tooltip({
+                    title: entry.value.text,
+                    container: 'body',
+                    delay: { "show": 300, "hide": 200 },
+                    animation: false
+                });
+        });
+
+        /*
+        for (var k in markClassNames) {
+            if (markClassNames.hasOwnProperty(k)) {
+                console.log(markClassNames[k])
+                $('.'+k).tooltip({
+                    title: markClassNames[k].text,
+                    container: 'body',
+                    delay: { "show": 300, "hide": 200 },
+                    animation: false
+                });
+            }
+        }
+        */
+       
     };
+    ws.onmessage = function (msg) {
+    	output.innerText = msg.data;
+        t = JSON.parse(msg.data);
+        markAllMatches(t.entries)
+    };
+    cm_grammar.on("change", function (e) {
+        jmsg = JSON.stringify({ grammar: cm_grammar.getDoc().getValue(), test_string: cm_test.getDoc().getValue() })
+        ws.send(jmsg);
+    });
 
     </script>
   </body>

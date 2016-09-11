@@ -39,9 +39,13 @@ div {
     -webkit-box-sizing:content-box;
     font-family: Consolas, Monaco, 'Lucida Console',monospace;
     font-size: 14px; !important
-    /*height: 100%; !important*/
+    height: 100%; !important
 }
 
+.tooltip-inner {
+    white-space:pre;
+    max-width:none;
+}
 
 #desk {
   height: 100%;
