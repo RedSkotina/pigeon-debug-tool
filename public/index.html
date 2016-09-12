@@ -33,7 +33,6 @@
             </div>
         </div>
 
-
         <div id="info_desk" class="flex-container">
                 <div id="output_container" class="flex-elem">
                     <label for="richtext_output_container">Output</label>
@@ -46,7 +45,7 @@
     </div>
         
     <script>
-    var url = "ws://" + window.location.host + "/ws";
+    var url = "ws://" + window.location.host + "/api/ws";
     var ws = new WebSocket(url);
     var output = document.getElementById("richtext_output");
     
@@ -60,17 +59,16 @@
 
 
     //adding a tooltip
-    var entries = []
+    var entries = [];
     var markers = [];    
 
     teditor.on("mousemove", function (e){
         var position = e.getDocumentPosition();
-        if(position){
-            //var objs = [{x1:0,x2:1,text:'a'},{x1:1,x2:2,text:'b'},{x1:2,x2:3,text:'c'},{x1:0,x2:3,text:'d'},{x1:2,x2:4,text:'e'}];
+        if (position) {
             posIdx = teditor.session.getDocument().positionToIndex(position,0);
             r = getRangesByPosIdx(entries,posIdx);
             var text = mergeTextByPosIdx(r,posIdx);
-            if(text.length>0){
+            if (text.length > 0) {
                 var pixelPosition = teditor.renderer.textToScreenCoordinates(position);
                 pixelPosition.pageY += teditor.renderer.lineHeight;
                 updateTooltip(pixelPosition, text);
@@ -80,12 +78,16 @@
             markers.forEach(function(e) {
                 teditor.session.removeMarker(e);
             });
-            markers = []
+            markers = [];
+            color = 0
             r.forEach(function(e) {
+                coloridx = color % 4 + 1
+                color += 1
+                bracket_class = "mark_bracket"+coloridx
                 p1 = teditor.session.getDocument().indexToPosition(e.x1,0);
                 p2 = teditor.session.getDocument().indexToPosition(e.x2,0);
                 range = new Range(p1.row, p1.column, p2.row, p2.column);
-                markers.push(teditor.session.addMarker(range, "ace_bracket", "text"));
+                markers.push(teditor.session.addMarker(range, bracket_class, "text"));
             });
             
         }
@@ -95,13 +97,14 @@
         var r = [];
         arr.forEach(function(e) {
             if ((e.x1 <= idx) && (idx < e.x2)) {
-                if ((r.length > 0) && (r[0].x < e.x1)) {
+                if ((r.length > 0) && (r[0].x1 <= e.x1) && (r[0].x2 >= e.x2)) {
                     r.unshift(e);
-            } else {
-                r.push(e);
-            }
+                } else {
+                    r.push(e);
+                }
         }   
         })
+        
         return r;
     }
     function mergeTextByPosIdx(arr, idx) {

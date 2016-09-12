@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gin-gonic/contrib/static"
 	"github.com/gin-gonic/gin"
 	"github.com/olahol/melody"
 )
@@ -30,59 +31,29 @@ func main() {
 	r := gin.Default()
 	m := melody.New()
 
-	r.GET("/", func(c *gin.Context) {
-		http.ServeFile(c.Writer, c.Request, "views/index.html")
-	})
+	r.Use(static.Serve("/", static.LocalFile("./public", true)))
 
-	r.GET("/app.css", func(c *gin.Context) {
-		http.ServeFile(c.Writer, c.Request, "views/app.css")
-	})
-	r.GET("codemirror/lib/codemirror.js", func(c *gin.Context) {
-		http.ServeFile(c.Writer, c.Request, "views/codemirror/lib/codemirror.js")
-	})
-	r.GET("codemirror/lib/codemirror.css", func(c *gin.Context) {
-		http.ServeFile(c.Writer, c.Request, "views/codemirror/lib/codemirror.css")
-	})
-	r.GET("codemirror/mode/pegjs/pegjs.js", func(c *gin.Context) {
-		http.ServeFile(c.Writer, c.Request, "views/codemirror/mode/pegjs/pegjs.js")
-	})
-	r.GET("bootstrap/3.3.7/css/bootstrap.min.css", func(c *gin.Context) {
-		http.ServeFile(c.Writer, c.Request, "views/bootstrap/3.3.7/css/bootstrap.min.css")
-	})
-	r.GET("bootstrap/3.3.7/css/bootstrap-theme.min.css", func(c *gin.Context) {
-		http.ServeFile(c.Writer, c.Request, "views/bootstrap/3.3.7/css/bootstrap-theme.min.css")
-	})
-	r.GET("bootstrap/3.3.7/js/bootstrap.min.js", func(c *gin.Context) {
-		http.ServeFile(c.Writer, c.Request, "views/bootstrap/3.3.7/js/bootstrap.min.js")
-	})
-	r.GET("bootstrap/3.3.7/css/bootstrap.min.css.map", func(c *gin.Context) {
-		http.ServeFile(c.Writer, c.Request, "views/bootstrap/3.3.7/css/bootstrap.min.css.map")
-	})
-	r.GET("bootstrap/3.3.7/css/bootstrap-theme.min.css.map", func(c *gin.Context) {
-		http.ServeFile(c.Writer, c.Request, "views/bootstrap/3.3.7/css/bootstrap-theme.min.css.map")
-	})
-	r.GET("tether.min.js", func(c *gin.Context) {
-		http.ServeFile(c.Writer, c.Request, "views/tether.min.js")
-	})
-	r.GET("jquery-3.1.0.min.js", func(c *gin.Context) {
-		http.ServeFile(c.Writer, c.Request, "views/jquery-3.1.0.min.js")
-	})
-
-	r.GET("/ws", func(c *gin.Context) {
-		m.HandleRequest(c.Writer, c.Request)
-	})
+	api := r.Group("/api")
+	{
+		api.GET("/ws", func(c *gin.Context) {
+			m.HandleRequest(c.Writer, c.Request)
+		})
+	}
 
 	m.HandleMessage(func(s *melody.Session, bmsg []byte) {
+		defer track(time.Now(), "HandleMessage")
 		var msg Msg
 		if err := json.Unmarshal(bmsg, &msg); err != nil {
 			log.Printf("json.Unmarshall: %v", err)
 		}
 		parser := generateParser(msg.Grammar)
 		out := compileAndRunGoSource(parser, msg.TestString)
-		jtrace := buildJsonTrace(out)
+		jtrace := buildJSONTrace(out)
 		m.Broadcast(jtrace)
 	})
+
 	httpAddr := getHTTPAddr()
+
 	go func() {
 		url := "http://" + httpAddr
 		if waitServer(url) && *openBrowser && startBrowser(url) {
@@ -164,7 +135,7 @@ func TempFileName(prefix, suffix string) string {
 	return filepath.Join(os.TempDir(), prefix+hex.EncodeToString(randBytes)+suffix)
 }
 
-func buildJsonTrace(trace bytes.Buffer) []byte {
+func buildJSONTrace(trace bytes.Buffer) []byte {
 	qtrace := strings.Replace(trace.String(), "\ufffd", "?", -1)
 	trace.Reset()
 	trace.WriteString(qtrace)
@@ -182,11 +153,12 @@ func buildJsonTrace(trace bytes.Buffer) []byte {
 	}
 	return jtrace
 }
-func walkEntry(t Tentry) []Tentry {
+
+func filterWalkEntry(t Tentry) []Tentry {
 	tr := []Tentry{}
 	ts := []Tentry{}
 	for _, v := range t.Calls {
-		g := walkEntry(v)
+		g := filterWalkEntry(v)
 		if len(g) != 0 {
 			ts = append(ts, g...)
 		}
@@ -202,7 +174,7 @@ func walkEntry(t Tentry) []Tentry {
 func filterTrace(t Ttrace) Ttrace {
 	ts := []Tentry{}
 	for _, v := range t.Entries {
-		g := walkEntry(v)
+		g := filterWalkEntry(v)
 		ts = append(ts, g...)
 	}
 
@@ -264,4 +236,9 @@ func startBrowser(url string) bool {
 	}
 	cmd := exec.Command(args[0], append(args[1:], url)...)
 	return cmd.Start() == nil
+}
+
+func track(start time.Time, name string) {
+	elapsed := time.Since(start)
+	log.Printf("%s took %s", name, elapsed)
 }
