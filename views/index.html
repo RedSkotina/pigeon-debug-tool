@@ -1,7 +1,4 @@
 <html>
-  <script src="codemirror/lib/codemirror.js"></script>
-  <link rel="stylesheet" href="codemirror/lib/codemirror.css">
-  <script src="codemirror/mode/pegjs/pegjs.js"></script>
   <script src="jquery-3.1.0.min.js"></script>
   <script src="tether.min.js"></script>
   <!-- Latest compiled and minified CSS -->
@@ -10,7 +7,8 @@
   <link rel="stylesheet" href="bootstrap/3.3.7/css/bootstrap-theme.min.css">
   <!-- Latest compiled and minified JavaScript -->
   <script src="bootstrap/3.3.7/js/bootstrap.min.js"></script>
-
+  <script src="ace/ace.js" type="text/javascript" charset="utf-8"></script>
+     
   <link href="app.css" rel="stylesheet" type="text/css">
   
   
@@ -41,7 +39,7 @@
                     <label for="richtext_output_container">Output</label>
                     <div id="richtext_output_container" class="overflow_handler">
                         <div id="richtext_output" class="richtext">Output will be displayed here automatically.</div>
-                    </div>
+                     </div>
                 </div>
         </div>
     
@@ -52,71 +50,109 @@
     var ws = new WebSocket(url);
     var output = document.getElementById("richtext_output");
     
-    var cm_grammar = CodeMirror(document.getElementById("richtext_grammar"), {
-        value: "function myScript(){return 100;}\n",
-        mode:  "pegjs",
-        lineNumbers: true
-    });
-    cm_grammar.setSize("100%", "100%");
-    var cm_test = CodeMirror(document.getElementById("richtext_test"), {
-        value: "test string is here\n",
-        mode:  "pegjs",
-        smartIndent: false,
-        electricChars: false,
-    });
-    cm_test.setSize("100%", "100%");
+    var geditor = ace.edit("richtext_grammar");
+    geditor.setTheme("ace/theme/chrome");
 
-    var markClassNames = {}
-    // provide pos x1,x2 because no method pos -> {line, ch}
-    function mark(c1, c2, text, x1, x2) {
-        className = 'marked-text'+c1.line+''+c1.ch+''+c2.line+''+c2.ch;
-        /*var markedElem = document.getElementById('.'+className);
-        if (markedElem !== null ) {
-            oldTitle = markedElem.attr('title')
-            markedElem.attr('title', oldTitle + '\n' + text); //update title
-            return;
-        }*/
-        var style = document.createElement('style');
-        style.type = 'text/css';
-        style.innerHTML = '.'+className+' { }\n' + '.' + className + ':hover { border: 1px solid red;}';
-        document.body.appendChild(style);
-    
-                    
-        var textMarker;
-        textMarker = cm_test.markText({
-            line: c1.line,
-            ch: c1.ch
-        }, {
-            line: c2.line,
-            ch: c2.ch
-        }, {
-            className: className,
-            //css: "color: #fe3"
-        });
-        //console.log(className)
-        if ( !(className in markClassNames) ) {
-            markClassNames[className] = { pos: {x1:x1 ,x2:x2}, text: text};
-        } else {
-            markClassNames[className].text = text + '\n' + markClassNames[className].text;
+    var teditor = ace.edit("richtext_test");
+    teditor.setTheme("ace/theme/chrome");
+    //editor.getSession().setMode("ace/mode/javascript");
+    var Range = ace.require('ace/range').Range;
+
+
+    //adding a tooltip
+    var entries = []
+    var markers = [];    
+
+    teditor.on("mousemove", function (e){
+        var position = e.getDocumentPosition();
+        if(position){
+            //var objs = [{x1:0,x2:1,text:'a'},{x1:1,x2:2,text:'b'},{x1:2,x2:3,text:'c'},{x1:0,x2:3,text:'d'},{x1:2,x2:4,text:'e'}];
+            posIdx = teditor.session.getDocument().positionToIndex(position,0);
+            r = getRangesByPosIdx(entries,posIdx);
+            var text = mergeTextByPosIdx(r,posIdx);
+            if(text.length>0){
+                var pixelPosition = teditor.renderer.textToScreenCoordinates(position);
+                pixelPosition.pageY += teditor.renderer.lineHeight;
+                updateTooltip(pixelPosition, text);
+            }else{
+                updateTooltip(teditor.renderer.textToScreenCoordinates(position));
+            }
+            markers.forEach(function(e) {
+                teditor.session.removeMarker(e);
+            });
+            markers = []
+            r.forEach(function(e) {
+                p1 = teditor.session.getDocument().indexToPosition(e.x1,0);
+                p2 = teditor.session.getDocument().indexToPosition(e.x2,0);
+                range = new Range(p1.row, p1.column, p2.row, p2.column);
+                markers.push(teditor.session.addMarker(range, "ace_bracket", "text"));
+            });
+            
         }
+    });
+
+    function getRangesByPosIdx(arr, idx) {
+        var r = [];
+        arr.forEach(function(e) {
+            if ((e.x1 <= idx) && (idx < e.x2)) {
+                if ((r.length > 0) && (r[0].x < e.x1)) {
+                    r.unshift(e);
+            } else {
+                r.push(e);
+            }
+        }   
+        })
+        return r;
+    }
+    function mergeTextByPosIdx(arr, idx) {
+        var text = '';
+        arr.forEach(function(e) {
+            if ((e.x1 <= idx ) && (idx < e.x2)) {
+                text += e.text + '\n';
+            }
+        });
+        return text
+    }
+
+    function updateTooltip(position, text){
+            //example with container creation via JS
+            var div = document.getElementById('rule_tooltip_0');
+            if(div === null){
+                div = document.createElement('div');        
+                div.setAttribute('id', 'rule_tooltip_0'); 
+                div.setAttribute('class', 'rule_tooltip'); // and make sure myclass has some styles in css
+                document.body.appendChild(div);
+            }
+
+            div.style.left = position.pageX + 'px';
+            div.style.top = position.pageY + 'px';
+            if(text){
+                div.style.display = "block";
+                div.innerText = text;
+            }else{
+                div.style.display = "none";
+                div.innerText = "";
+            }           
+
+        }
+
+    
+    function mark(x1, x2, text) {
+        entries.push({ x1:x1, x2:x2, text: text})
     }
     
     function traverse(jsonObj) {
         if( typeof jsonObj == "object") {
             $.each(jsonObj, function(k,v) {
                 if ("calls" in v) {
-                    var c2,x2
-                    c1 = cm_test.findPosH({line:0,ch:0}, v.detail.pos.Pos,'char',false);
+                    var x2
                     x1 = v.detail.pos.Pos
                     if (v.match !== null) {
-                        c2 = cm_test.findPosH({line:0,ch:0}, v.match.pos.Pos,'char',false);
                         x2 = v.match.pos.Pos;
                     } else {
-                        c2 = c1;
                         x2 = x1;
                     }
-                    
-                    mark(c1, c2, v.detail.name, x1, x2)
+                    mark(x1, x2, v.detail.name)
                 
                     traverse(v.calls);
                 }
@@ -127,76 +163,17 @@
         }
     }
     var markAllMatches = function(e) {
-        // clear all marks
-        marks = cm_test.getDoc().getAllMarks()
-        marks.forEach(function(item, i, arr) {
-            item.clear();
-        });
-        // clear all marks styles
-        var regex = /^\.marked-text.*/;
-        var elements = document.querySelectorAll('body > style');
-        [].forEach.call(elements, function( el ) {
-            if ( regex.test(el.innerHTML) ) {
-                el.parentNode.removeChild(el);
-            };
-        });
-        
-        markClassNames = {}
-
+        entries = []
         traverse(e);
+   };
 
-        // enable tooltips for marked classes
-        // sort objects (workaround bootstrap tooltip bug): first - nested elements according nesting level
-        // object -> array of objects
-        tooltips = []
-        for (var k in markClassNames) {
-            if (markClassNames.hasOwnProperty(k)) {
-                tooltips.push({key:k, value:markClassNames[k]})
-                console.log(k,markClassNames[k]);
-            }
-        }
-        // todo: check when partial intersect?
-        function compare(a,b) {
-            if ( (a.value.pos.x1 >= b.value.pos.x1) && (a.value.pos.x2 <= b.value.pos.x2) )
-                return -1;
-            if ( (a.value.pos.x1 <= b.value.pos.x1) && (a.value.pos.x2 >= b.value.pos.x2) )
-                return 1;
-            return 0;
-        }
-        tooltips = tooltips.sort(compare);
-        // todo: need add text of nested ranges to big ranges
-        tooltips.forEach(function(entry) {
-            console.log(entry);
-            $('.'+entry.key).tooltip({
-                    title: entry.value.text,
-                    container: 'body',
-                    delay: { "show": 300, "hide": 200 },
-                    animation: false
-                });
-        });
-
-        /*
-        for (var k in markClassNames) {
-            if (markClassNames.hasOwnProperty(k)) {
-                console.log(markClassNames[k])
-                $('.'+k).tooltip({
-                    title: markClassNames[k].text,
-                    container: 'body',
-                    delay: { "show": 300, "hide": 200 },
-                    animation: false
-                });
-            }
-        }
-        */
-       
-    };
     ws.onmessage = function (msg) {
     	output.innerText = msg.data;
         t = JSON.parse(msg.data);
         markAllMatches(t.entries)
     };
-    cm_grammar.on("change", function (e) {
-        jmsg = JSON.stringify({ grammar: cm_grammar.getDoc().getValue(), test_string: cm_test.getDoc().getValue() })
+    geditor.on("change", function (e) {
+        jmsg = JSON.stringify({ grammar: geditor.session.getDocument().getValue(), test_string: teditor.session.getDocument().getValue() })
         ws.send(jmsg);
     });
 

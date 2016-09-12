@@ -32,20 +32,46 @@ div {
   box-sizing: border-box;
 }
 
-.CodeMirror  {
-    box-sizing: content-box;
-    -moz-box-sizing: content-box;
-    -ms-box-sizing: content-box;
-    -webkit-box-sizing:content-box;
-    font-family: Consolas, Monaco, 'Lucida Console',monospace;
-    font-size: 14px; !important
-    height: 100%; !important
+#editor {
+  /** Setting height is also important, otherwise editor wont showup**/
+  height: 300px;
 }
 
-.tooltip-inner {
-    white-space:pre;
-    max-width:none;
+#editor {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  border: solid 1px;
 }
+
+.rule_tooltip {
+    background-color: #FFF;
+    background-image: -webkit-linear-gradient(top, transparent, rgba(0, 0, 0, 0.1));
+    background-image: linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.1));
+    border: 1px solid gray;
+    border-radius: 1px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    color: black;
+    max-width: 100%;
+    padding: 3px 4px;
+    position: absolute;
+    z-index: 999999;
+    -moz-box-sizing: border-box;
+    -webkit-box-sizing: border-box;
+    box-sizing: border-box;
+    cursor: default;
+    white-space: pre;
+    word-wrap: break-word;
+    line-height: normal;
+    font-style: normal;
+    font-weight: normal;
+    letter-spacing: normal;
+    pointer-events: none;
+}
+
+.ace_bracket { border-radius:4px; }
 
 #desk {
   height: 100%;
