@@ -27,6 +27,12 @@ var (
 	openBrowser = flag.Bool("openbrowser", true, "open browser automatically")
 )
 
+// Msg for communicating with frontend
+type Msg struct {
+	Grammar    string `json:"grammar"`
+	TestString string `json:"test_string"`
+}
+
 func main() {
 	r := gin.Default()
 	m := melody.New()
@@ -48,7 +54,7 @@ func main() {
 			log.Printf("json.Unmarshall: %v", err)
 		}
 		parser := generateParser(msg.Grammar)
-		out := compileAndRunGoSource(parser, msg.TestString)
+		out := runParser(parser, msg.TestString)
 		jtrace := buildJSONTrace(out)
 		m.Broadcast(jtrace)
 	})
@@ -68,28 +74,20 @@ func main() {
 
 }
 
-// Msg for communicating with frontend
-type Msg struct {
-	Grammar    string `json:"grammar"`
-	TestString string `json:"test_string"`
-}
-
 func generateParser(msg string) bytes.Buffer {
+	var pigout, pigerr bytes.Buffer
 	pigeon := exec.Command("pigeon")
 	pigeon.Stdin = strings.NewReader(msg)
-
-	var pigout, pigerr bytes.Buffer
 	pigeon.Stdout = &pigout
 	pigeon.Stderr = &pigerr
 	err := pigeon.Run()
 	if err != nil {
 		log.Printf("PIGEON STDERR: %v", pigerr.String())
 	}
-	var t bytes.Buffer
-	t.WriteString(mainFunc + pigout.String())
+	var impin, impout, imperr bytes.Buffer
 	goimports := exec.Command("goimports")
-	goimports.Stdin = strings.NewReader(t.String())
-	var impout, imperr bytes.Buffer
+	impin.WriteString(mainFunc + pigout.String())
+	goimports.Stdin = strings.NewReader(impin.String())
 	goimports.Stdout = &impout
 	goimports.Stderr = &imperr
 	err = goimports.Run()
@@ -109,24 +107,23 @@ func main() {
 }
 `
 
-func compileAndRunGoSource(source bytes.Buffer, test string) bytes.Buffer {
+func runParser(source bytes.Buffer, test string) bytes.Buffer {
 	tmpfilename := TempFileName("pigeon", ".go")
 	err := ioutil.WriteFile(tmpfilename, source.Bytes(), 0644)
 	defer os.Remove(tmpfilename)
 
-	log.Printf("go run %v", tmpfilename)
+	//log.Printf("go run %v", tmpfilename)
+	var runout, runerr bytes.Buffer
 	gorun := exec.Command("go", "run", tmpfilename)
 	gorun.Stdin = strings.NewReader(test)
-
-	var out, stderr bytes.Buffer
-	gorun.Stdout = &out
-	gorun.Stderr = &stderr
+	gorun.Stdout = &runout
+	gorun.Stderr = &runerr
 	err = gorun.Run()
 	if err != nil {
-		//log.Printf("GORUN STDERR: %v", stderr.String())
-		out.Write(stderr.Bytes())
+		//log.Printf("GORUN ERROR: %v", runerr.String())
+		runout.Write(runerr.Bytes())
 	}
-	return out
+	return runout
 }
 
 //TempFileName generates a temporary filename for use in testing or whatever
@@ -137,17 +134,17 @@ func TempFileName(prefix, suffix string) string {
 }
 
 func buildJSONTrace(trace bytes.Buffer) []byte {
-	qtrace := strings.Replace(trace.String(), "\ufffd", "?", -1)
+	qtrace := strings.Replace(trace.String(), "\ufffd", "?", -1) // fix pigeon bug
 	trace.Reset()
 	trace.WriteString(qtrace)
-	log.Printf("%v\n", trace.String())
+	//log.Printf("%v\n", trace.String())
 	got, err := ParseReader("", &trace)
 	if err != nil {
 		log.Fatal(err)
 	}
 	strace := got.(Ttrace)
 	ftrace := filterTrace(strace)
-	log.Printf("%v\n", ftrace)
+	//log.Printf("%v\n", ftrace)
 	jtrace, err := json.Marshal(ftrace)
 	if err != nil {
 		log.Printf("Cant marshal json\n")
@@ -155,31 +152,30 @@ func buildJSONTrace(trace bytes.Buffer) []byte {
 	return jtrace
 }
 
-func filterWalkEntry(t Tentry) []Tentry {
-	tr := []Tentry{}
-	ts := []Tentry{}
-	for _, v := range t.Calls {
+func filterWalkEntry(e Tentry) []Tentry {
+	res := []Tentry{}
+	fcalls := []Tentry{}
+	for _, v := range e.Calls {
 		g := filterWalkEntry(v)
 		if len(g) != 0 {
-			ts = append(ts, g...)
+			fcalls = append(fcalls, g...)
 		}
 	}
-	if strings.HasPrefix(t.Detail.Name, "Rule ") {
-		t.Calls = ts
-		tr = append(tr, t)
+	if strings.HasPrefix(e.Detail.Name, "Rule ") {
+		e.Calls = fcalls
+		res = append(res, e)
 	} else {
-		tr = ts
+		res = fcalls
 	}
-	return tr
+	return res
 }
 func filterTrace(t Ttrace) Ttrace {
-	ts := []Tentry{}
+	r := []Tentry{}
 	for _, v := range t.Entries {
 		g := filterWalkEntry(v)
-		ts = append(ts, g...)
+		r = append(r, g...)
 	}
-
-	return Ttrace{ts}
+	return Ttrace{entries: r}
 }
 
 func getHTTPAddr() string {
