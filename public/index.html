@@ -22,13 +22,15 @@
                     <span id="result_indicator" class="no_match">no match</span>
                 </label>
                 <div id="richtext_grammar_container" class="richtext_container overflow_handler">
-                    <div id="richtext_grammar" class="richtext"></div>
+                    <div id="richtext_grammar" class="richtext">r <- a x* a
+a <- 'a'
+x <- 'x'</div>
                 </div>
             </div>
             <div id="test_container" class="flex-text">
                 <label for="richtext_test_container">Test string</label>
                 <div id="richtext_test_container" class="richtext_container overflow_handler">
-                    <div id="richtext_test" class="richtext"></div>
+                    <div id="richtext_test" class="richtext">axxa</div>
                 </div>
             </div>
         </div>
@@ -81,7 +83,7 @@
             markers = [];
             color = 0
             r.forEach(function(e) {
-                coloridx = color % 4 + 1
+                coloridx = color % 10 + 1
                 color += 1
                 bracket_class = "mark_bracket"+coloridx
                 p1 = teditor.session.getDocument().indexToPosition(e.x1,0);
@@ -106,12 +108,16 @@
         })
         return r;
     }
-    
+
     function mergeTextByPosIdx(arr, idx) {
         var text = '';
         arr.forEach(function(e) {
             if ((e.x1 <= idx ) && (idx < e.x2)) {
-                text += e.text + '\n';
+                if (e.matched)
+                    color = 'green'
+                else
+                    color = 'gray';
+                text += '<font color="'+color+'">' + e.text + '</font><br>';
             }
         });
         return text
@@ -131,33 +137,39 @@
             div.style.top = position.pageY + 'px';
             if(text){
                 div.style.display = "block";
-                div.innerText = text;
+                div.innerHTML = text;
             }else{
                 div.style.display = "none";
-                div.innerText = "";
+                div.innerHTML = "";
             }           
 
         }
 
     
-    function mark(x1, x2, text) {
-        entries.push({ x1:x1, x2:x2, text: text})
+    function mark(x1, x2, text, matched) {
+        entries.push({ x1:x1, x2:x2, text: text, matched: matched})
     }
     
     function traverse(jsonObj) {
         if( typeof jsonObj == "object") {
             $.each(jsonObj, function(k,v) {
                 if ("calls" in v) {
-                    var x2
+                    var maxPos = v.detail.pos.Pos;
+                    $.each(v.calls, function(u,r) {
+                        if (r.match !== null) {
+                            maxPos = Math.max(maxPos,r.match.pos.Pos);
+                        }
+                    });
+                    var x2;                    
                     x1 = v.detail.pos.Pos
                     if (v.match !== null) {
                         x2 = v.match.pos.Pos;
                     } else {
-                        x2 = x1;
+                        x2 = maxPos;
                     }
-                    mark(x1, x2, v.detail.name)
+                    mark(x1, x2, v.detail.name, (v.match !== null) )
                 
-                    traverse(v.calls);
+                    traverse(v.calls);                    
                 }
             });
         }

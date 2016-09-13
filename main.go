@@ -137,7 +137,7 @@ func buildJSONTrace(trace bytes.Buffer) []byte {
 	qtrace := strings.Replace(trace.String(), "\ufffd", "?", -1) // fix pigeon bug
 	trace.Reset()
 	trace.WriteString(qtrace)
-	//log.Printf("%v\n", trace.String())
+	log.Printf("%v\n", trace.String())
 	got, err := ParseReader("", &trace)
 	if err != nil {
 		log.Fatal(err)
@@ -161,7 +161,10 @@ func filterWalkEntry(e Tentry) []Tentry {
 			fcalls = append(fcalls, g...)
 		}
 	}
-	if strings.HasPrefix(e.Detail.Name, "Rule ") {
+	if  ( strings.HasPrefix(e.Detail.Name, "Rule ") ||  
+	      strings.HasPrefix(e.Detail.Name, "ZeroOrOneExpr ") ||
+		  strings.HasPrefix(e.Detail.Name, "OneOrMoreExpr ") ||
+		  strings.HasPrefix(e.Detail.Name, "ZeroOrMoreExpr ") ) {
 		e.Calls = fcalls
 		res = append(res, e)
 	} else {
@@ -175,7 +178,7 @@ func filterTrace(t Ttrace) Ttrace {
 		g := filterWalkEntry(v)
 		r = append(r, g...)
 	}
-	return Ttrace{entries: r}
+	return Ttrace{Entries: r}
 }
 
 func getHTTPAddr() string {
