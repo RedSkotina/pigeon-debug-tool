@@ -8,7 +8,10 @@
   <!-- Latest compiled and minified JavaScript -->
   <script src="lib/bootstrap/3.3.7/js/bootstrap.min.js"></script>
   <script src="lib/ace/ace.js" type="text/javascript" charset="utf-8"></script>
-     
+
+  <script src="lib/jquery.json-view/jquery.json-view.js"></script>
+  <link href="lib/jquery.json-view/jquery.json-view.css" rel="stylesheet">
+   
   <link href="app.css" rel="stylesheet" type="text/css">
   
   
@@ -183,8 +186,10 @@ x <- 'x'</div>
    };
 
     ws.onmessage = function (msg) {
-    	output.innerText = msg.data;
+    	//output.innerText = msg.data;
+        output.innerText = "";
         t = JSON.parse(msg.data);
+        $('#richtext_output').jsonView(t.entries, { 'collapse_first': true });
         markAllMatches(t.entries)
     };
     geditor.on("change", function (e) {
