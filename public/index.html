@@ -8,10 +8,13 @@
   <!-- Latest compiled and minified JavaScript -->
   <script src="lib/bootstrap/3.3.7/js/bootstrap.min.js"></script>
   <script src="lib/ace/ace.js" type="text/javascript" charset="utf-8"></script>
+  
+  <link href="lib/bootstrap-treeview/css/bootstrap-treeview.css" rel="stylesheet">
+  <script src="lib/bootstrap-treeview/js/bootstrap-treeview.js"></script>
 
-  <script src="lib/jquery.json-view/jquery.json-view.js"></script>
+  <!--<script src="lib/jquery.json-view/jquery.json-view.js"></script>
   <link href="lib/jquery.json-view/jquery.json-view.css" rel="stylesheet">
-   
+   -->
   <link href="app.css" rel="stylesheet" type="text/css">
   
   
@@ -25,20 +28,98 @@
                     <span id="result_indicator" class="no_match">no match</span>
                 </label>
                 <div id="richtext_grammar_container" class="richtext_container overflow_handler">
-                    <div id="richtext_grammar" class="richtext">r <- a x* a
-a <- 'a'
-x <- 'x'</div>
+                    <div id="richtext_grammar" class="richtext">
+{
+func toIfaceSlice(v interface{}) []interface{} {
+    if v == nil {
+        return nil
+    }
+    return v.([]interface{})
+}
+}
+
+DmUnit <- 
+    #{ state["Indentation"] = 0; return nil }  Statements EOF
+
+Statements  <- 
+    s:Line+
+
+Line <-
+    INDENTATION s:Statement
+
+Statement <- 
+     ObjDeclaration
+
+ObjDeclaration <- 
+    ObjIdentifier ObjBlock
+ObjIdentifier <-
+    Slash? (atom / datum / Identifier) (Slash (atom / datum / Identifier))* EOL
+ObjBlock <-
+    INDENT INDENTATION ((ObjDeclaration / ObjBlockStatement ) EOL+)+ DEDENT
+
+Slash <- "/"
+atom <-
+    "atom"
+  / "area"
+  / "turf"
+  / "obj"
+  / "mob"
+datum <-
+     "datum"
+  /  "world"
+  /  "client"
+  /  "list"
+
+ObjBlockStatement <-
+     VarAssignment
+Identifier <-
+     [a-zA-Z] [a-zA-Z0-9]* 
+
+VarAssignment <-
+     LValue _ AssignmentOp _ VarInitializer
+LValue <- Identifier
+AssignmentOp <- "="
+VarInitializer <- [0-9]
+
+
+_ <- [ \t]+
+
+EOL <- _? ( NL / EOF)
+NL  <- "\r\n" / "\n\r" / "\r" / "\n"
+EOF <- !.
+
+INDENTATION <- spaces:"\t"* &{ return len(toIfaceSlice(spaces)) == state["Indentation"].(int), nil }
+
+INDENT <- #{ state["Indentation"] = state["Indentation"].(int) + 1; return nil }
+
+DEDENT <- #{ state["Indentation"] = state["Indentation"].(int) - 1; return nil }</div>
                 </div>
             </div>
             <div id="test_container" class="flex-text">
                 <label for="richtext_test_container">Test string</label>
                 <div id="richtext_test_container" class="richtext_container overflow_handler">
-                    <div id="richtext_test" class="richtext">axxa</div>
+                    <div id="richtext_test" class="richtext">turf
+	floor
+		icon = 1
+
+	wall
+		icon = 0
+		density = 1
+		opacity = 1
+
+		secret_door
+			name = 0
+			density = 0
+
+	window
+		icon = 1
+		density = 1
+</div>
                 </div>
             </div>
         </div>
 
-        <div id="info_desk" class="flex-container">
+        <div id="info_desk" class="flex-container scroll_y">
                 <div id="output_container" class="flex-elem">
                     <label for="richtext_output_container">Output</label>
                     <div id="richtext_output_container" class="overflow_handler">
@@ -180,20 +261,77 @@ x <- 'x'</div>
             // jsonOb is a number or string
         }
     }
+
     var markAllMatches = function(e) {
         entries = []
         traverse(e);
-   };
+    };
 
+    function genJSONTree(t) {
+       var genBlock = function(data) {
+            switch($.type(data)) {
+                case 'object':
+                    var node = {text: '', nodes: null};
+                    var match = '';
+                    if (data.match !== null) {
+                        match = data.match.pos.Pos;
+                    } else {
+                        match = '_'
+                    }
+                    node.text = "[" + data.detail.pos.Pos + ',' + match + '] ' + data.detail.name;
+                    node.nodes = genBlock(data.calls);
+                    return node
+                    
+                case 'array':
+                    var nodes = [];
+                    $.each(data, function(k,v) {
+                        node = genBlock(v)
+                        nodes.push(node)
+                    });
+                    if (nodes.length == 0 )
+                        return null;
+                    return nodes;
+                /*
+                case 'string':
+                    return data
+
+                case 'number':
+                    return data;
+
+                case 'undefined':
+                    return 'undefined';
+
+                case 'null':
+                    return 'null';
+
+                case 'boolean':
+                    return data;*/
+            }
+            
+       };
+       return genBlock(t); 
+    }
+    
+    var start_time = 0;
     ws.onmessage = function (msg) {
     	//output.innerText = msg.data;
         output.innerText = "";
         t = JSON.parse(msg.data);
-        $('#richtext_output').jsonView(t.entries, { 'collapse_first': true });
+        console.log(t.errors)
+        if (t.errors != "") {
+            $('#richtext_output').text(t.errors)
+            $('#result_indicator').text('error');
+            return;
+        }
+        $('#richtext_output').treeview({data: genJSONTree(t.entries)});
         markAllMatches(t.entries)
+        exec_time = performance.now() - start_time;
+        $('#result_indicator').text(Math.round(exec_time) + 'ms');
     };
     geditor.on("change", function (e) {
         jmsg = JSON.stringify({ grammar: geditor.session.getDocument().getValue(), test_string: teditor.session.getDocument().getValue() })
+        start_time = performance.now();
+        $('#result_indicator').text('wait');
         ws.send(jmsg);
     });
 

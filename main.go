@@ -49,14 +49,34 @@ func main() {
 
 	m.HandleMessage(func(s *melody.Session, bmsg []byte) {
 		defer track(time.Now(), "HandleMessage")
+
+		analyzePEG := func(msg Msg) Ttrace {
+			parser,err := generateParser(msg.Grammar)
+			if (err != nil) {
+				return Ttrace{ Errors: parser.String() }
+			}
+			out,err := runParser(parser, msg.TestString)
+			if (err != nil) {
+				return Ttrace{ Errors: out.String() }
+			}
+			trace,err := analyzeTrace(out)
+			if (err != nil) {
+				return Ttrace{ Errors: err.Error() }
+			}
+			trace.Errors = ""
+			return trace
+		}
+
 		var msg Msg
 		if err := json.Unmarshal(bmsg, &msg); err != nil {
 			log.Printf("json.Unmarshall: %v", err)
 		}
-		parser := generateParser(msg.Grammar)
-		out := runParser(parser, msg.TestString)
-		jtrace := buildJSONTrace(out)
-		m.Broadcast(jtrace)
+		trace := analyzePEG(msg)
+		resp,err := buildResponse(trace)
+		if (err != nil) {
+			resp = []byte(err.Error())
+		}
+		m.Broadcast(resp)
 	})
 
 	httpAddr := getHTTPAddr()
@@ -74,7 +94,7 @@ func main() {
 
 }
 
-func generateParser(msg string) bytes.Buffer {
+func generateParser(msg string) (bytes.Buffer, error) {
 	var pigout, pigerr bytes.Buffer
 	pigeon := exec.Command("pigeon")
 	pigeon.Stdin = strings.NewReader(msg)
@@ -83,6 +103,7 @@ func generateParser(msg string) bytes.Buffer {
 	err := pigeon.Run()
 	if err != nil {
 		log.Printf("PIGEON STDERR: %v", pigerr.String())
+		return *bytes.NewBufferString("PIGEON STDERR: "+pigerr.String()), err
 	}
 	var impin, impout, imperr bytes.Buffer
 	goimports := exec.Command("goimports")
@@ -93,8 +114,9 @@ func generateParser(msg string) bytes.Buffer {
 	err = goimports.Run()
 	if err != nil {
 		log.Printf("GOIMPORTS STDERR: %v", imperr.String())
+		return *bytes.NewBufferString("GOIMPORTS STDERR: "+imperr.String()), err
 	}
-	return impout
+	return impout, nil
 }
 
 const mainFunc = `
@@ -107,9 +129,14 @@ func main() {
 }
 `
 
-func runParser(source bytes.Buffer, test string) bytes.Buffer {
+func runParser(source bytes.Buffer, test string) (bytes.Buffer, error) {
 	tmpfilename := TempFileName("pigeon", ".go")
 	err := ioutil.WriteFile(tmpfilename, source.Bytes(), 0644)
+	if err != nil {
+		log.Printf("GO RUN ERROR(WriteFile): %v", err.Error())
+		//runout.Write(runerr.Bytes())
+		return *bytes.NewBufferString("GO RUN STDERR(WriteFile): "+err.Error()), err
+	}
 	defer os.Remove(tmpfilename)
 
 	//log.Printf("go run %v", tmpfilename)
@@ -118,12 +145,15 @@ func runParser(source bytes.Buffer, test string) bytes.Buffer {
 	gorun.Stdin = strings.NewReader(test)
 	gorun.Stdout = &runout
 	gorun.Stderr = &runerr
-	err = gorun.Run()
+	_ = gorun.Run()
+	/*
 	if err != nil {
-		//log.Printf("GORUN ERROR: %v", runerr.String())
-		runout.Write(runerr.Bytes())
+		log.Printf("GORUN ERROR: %v", runerr.String())
+		//runout.Write(runerr.Bytes())
+		return *bytes.NewBufferString("GO RUN STDERR: "+runerr.String()), err
 	}
-	return runout
+	*/
+	return runout, nil
 }
 
 //TempFileName generates a temporary filename for use in testing or whatever
@@ -132,50 +162,57 @@ func TempFileName(prefix, suffix string) string {
 	rand.Read(randBytes)
 	return filepath.Join(os.TempDir(), prefix+hex.EncodeToString(randBytes)+suffix)
 }
-
-func buildJSONTrace(trace bytes.Buffer) []byte {
-	qtrace := strings.Replace(trace.String(), "\ufffd", "?", -1) // fix pigeon bug
-	trace.Reset()
-	trace.WriteString(qtrace)
-	log.Printf("%v\n", trace.String())
-	got, err := ParseReader("", &trace)
+func analyzeTrace(b bytes.Buffer) (Ttrace, error) {
+	s := strings.Replace(b.String(), "\ufffd", "?", -1) // fix pigeon bug
+	b.Reset()
+	b.WriteString(s)
+	//log.Printf("%v\n", trace.String())
+	got, err := ParseReader("", &b)
 	if err != nil {
 		log.Fatal(err)
+		return Ttrace{}, err
 	}
-	strace := got.(Ttrace)
-	ftrace := filterTrace(strace)
-	//log.Printf("%v\n", ftrace)
-	jtrace, err := json.Marshal(ftrace)
-	if err != nil {
-		log.Printf("Cant marshal json\n")
-	}
-	return jtrace
+	trace := got.(Ttrace)
+	ftrace := filterTrace(trace)
+	return ftrace, nil
 }
 
-func filterWalkEntry(e Tentry) []Tentry {
-	res := []Tentry{}
-	fcalls := []Tentry{}
-	for _, v := range e.Calls {
-		g := filterWalkEntry(v)
-		if len(g) != 0 {
-			fcalls = append(fcalls, g...)
-		}
+func buildResponse(trace Ttrace) ([]byte, error) {
+	//log.Printf("%v\n", ftrace)
+	jtrace, err := json.Marshal(trace)
+	if err != nil {
+		log.Printf("Cant marshal json\n")
+		return bytes.NewBufferString("BUILD JSON: Cant marshal json").Bytes(), err
 	}
-	if  ( strings.HasPrefix(e.Detail.Name, "Rule ") ||  
-	      strings.HasPrefix(e.Detail.Name, "ZeroOrOneExpr ") ||
-		  strings.HasPrefix(e.Detail.Name, "OneOrMoreExpr ") ||
-		  strings.HasPrefix(e.Detail.Name, "ZeroOrMoreExpr ") ) {
-		e.Calls = fcalls
-		res = append(res, e)
-	} else {
-		res = fcalls
-	}
-	return res
+	return jtrace, nil
 }
+
 func filterTrace(t Ttrace) Ttrace {
+	var walk  func(e Tentry) []Tentry;
+	walk = func(e Tentry) []Tentry {
+		res := []Tentry{}
+		fcalls := []Tentry{}
+		for _, v := range e.Calls {
+			g := walk(v)
+			if len(g) != 0 {
+				fcalls = append(fcalls, g...)
+			}
+		}
+		if  ( strings.HasPrefix(e.Detail.Name, "Rule ") ||  
+			strings.HasPrefix(e.Detail.Name, "ZeroOrOneExpr ") ||
+			strings.HasPrefix(e.Detail.Name, "OneOrMoreExpr ") ||
+			strings.HasPrefix(e.Detail.Name, "ZeroOrMoreExpr ") ) {
+			e.Calls = fcalls
+			res = append(res, e)
+		} else {
+			res = fcalls
+		}
+		return res
+	}
+
 	r := []Tentry{}
 	for _, v := range t.Entries {
-		g := filterWalkEntry(v)
+		g := walk(v)
 		r = append(r, g...)
 	}
 	return Ttrace{Entries: r}

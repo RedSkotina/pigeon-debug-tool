@@ -154,6 +154,10 @@ div {
   font-style: normal;
 }
 
+.scroll_y {
+  overflow-y: scroll !important;
+  /*position: absolute !important;*/
+}
 #richtext_test, #richtext_grammar{
   /*
   resize: none !important;
