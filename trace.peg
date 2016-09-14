@@ -8,7 +8,7 @@ func main() {
 	}
 	
     //fmt.Println(got)
-    strace := got.(Ttrace)
+    strace := got.(TTrace)
 
 	jtrace, err := json.Marshal(strace)
 	if err != nil {
@@ -18,6 +18,7 @@ func main() {
     
 } 
 */
+
 func toIfaceSlice(v interface{}) []interface{} {
 	if v == nil {
 		return nil
@@ -35,80 +36,84 @@ func IfaceSliceToString(v []interface{}) string {
     return buffer.String()
 }
 
-func IfaceSliceToEntrySlice(a []interface{}) []Tentry {
+func IfaceSliceToEntrySlice(a []interface{}) []TEntry {
     if a == nil {
-        return []Tentry{}
+        return []TEntry{}
     }
-    g := make([]Tentry, 0, len(a))
+    g := make([]TEntry, 0, len(a))
     for _, v := range a {
-        g = append(g, v.(Tentry))
+        g = append(g, v.(TEntry))
     }
     return g
 }
 
-type Tposition struct {
-    Line,Col,Pos int 
-}
-type tcursor struct {
-    codepoint int 
-}
-
-type Tmatch struct {
-    Pos Tposition `json:"pos"`
-    Text string   `json:"text"`
+type TDetail struct {
+    Idx1  int      `json:"idx1"`
+    Idx2  int      `json:"idx2"`
+    Name string    `json:"name"`
 }
 
-type Tdetail struct {
-    Pos Tposition `json:"pos"`
-    Name string   `json:"name"`
+type TEntry struct {
+    Detail TDetail `json:"detail"`
+    Calls []TEntry `json:"calls"`
+    IsMatch bool  `json:"ismatch"`
 }
 
-type Tentry struct {
-    Detail Tdetail `json:"detail"`
-    Calls []Tentry `json:"calls"`
-    Match *Tmatch  `json:"match"`
-}
-
-type Ttrace struct {
-    Entries []Tentry `json:"entries"`
+type TTrace struct {
+    Entries []TEntry `json:"entries"`
     Errors string    `json:"errors"`
-    MaxIdx int       `json:"maxidx"`
 }
 
-func toMatchRef(m interface{}) *Tmatch {
+func isNotNull(m interface{}) bool {
     if m == nil {
-        return nil
+        return false
     }
-    r := m.(Tmatch)
-    return &r
+    return true
+}
+
+func matchPos(m interface{}, defaultIdx int) int {
+    if isNotNull(m) {
+        return m.(int)
+    }
+    return defaultIdx
 }
 
 }
 
-Trace <- #{state["indent"]=1; return nil} lines:(TraceLine)* { return Ttrace{IfaceSliceToEntrySlice(toIfaceSlice(lines)),"", 0},nil }
-TraceLine <- INDENTATION entry:TraceEntry  { return entry,nil }
+Trace <- #{state["indent"]=1; return nil} lines:(TraceLine)* { return TTrace{IfaceSliceToEntrySlice(toIfaceSlice(lines)), ""}, nil }
+TraceLine <- INDENTATION entry:TraceEntry  { return entry, nil }
 
-TraceEntry <-  INDENT enter:EnterParseEntry calls:(TraceEntry / RestoreEntry)* match:MatchEntry? DEDENT ExitParseEntry 
-    { return Tentry{enter.(Tdetail), IfaceSliceToEntrySlice(toIfaceSlice(calls)), toMatchRef(match)}, nil }
+TraceEntry <-  INDENT enter:EnterParseEntry calls:(TraceEntry / RestoreEntry)* match:MatchEntry? DEDENT exit:ExitParseEntry 
+    { return TEntry{
+                TDetail{ enter.(TDetail).Idx1, matchPos(match, exit.(TDetail).Idx2), enter.(TDetail).Name },
+                IfaceSliceToEntrySlice(toIfaceSlice(calls)),
+                isNotNull(match),
+                },
+                nil }
 EnterParseEntry <- _* '>' _ pos:Position _ "parse" text:(!Cursor .)* cur:Cursor NL
-    { return Tdetail{pos.(Tposition), IfaceSliceToString(toIfaceSlice(text)) }, nil }
+    { return TDetail{Idx1: pos.(int), Name: IfaceSliceToString(toIfaceSlice(text)) }, nil }
 ExitParseEntry  <- _* '<' _ pos:Position _ "parse" text:(!Cursor .)* cur:Cursor NL
-    { return Tdetail{pos.(Tposition), IfaceSliceToString(toIfaceSlice(text)) }, nil }
+    { return TDetail{Idx2: pos.(int), Name: IfaceSliceToString(toIfaceSlice(text)) }, nil }
 
 RestoreEntry <- INDENT enter:EnterRestoreEntry DEDENT exit:ExitRestoreEntry 
-    { return Tentry{enter.(Tdetail), []Tentry{}, nil}, nil }
+    { return TEntry{ 
+                TDetail{ enter.(TDetail).Idx1, exit.(TDetail).Idx2, enter.(TDetail).Name },
+                []TEntry{},
+                 false,
+                 },
+                 nil }
 EnterRestoreEntry    <- _* '>' _ pos:Position _ "restore" _ cur:Cursor NL
-    { return Tdetail{pos.(Tposition), "restore" }, nil }
+    { return TDetail{Idx1: pos.(int), Name: "restore" }, nil }
 ExitRestoreEntry     <- _* '<' _ pos:Position _ "restore" _ cur:Cursor NL
-    { return Tdetail{pos.(Tposition), "restore" }, nil }
+    { return TDetail{Idx2: pos.(int), Name: "restore" }, nil }
 
 MatchEntry <- _* "MATCH" _ pos:Position _ text:(!Cursor .)* cur:Cursor NL
-    { return Tmatch{pos.(Tposition), IfaceSliceToString(toIfaceSlice(text))}, nil }
+    { return pos, nil }
 
 Cursor <- "[U+" n:HexNumber (_ "'" . "'")? "]" { return n, nil }
-Position <- line:Number ':' col:Number ':' pos:Number ':' { return Tposition{line.(int),col.(int),pos.(int)}, nil }
-Number <- [0-9]+ { n,err := strconv.ParseInt(string(c.text), 0, 64); return int(n),err }
-HexNumber <- [0-9A-F]+ { n,err := strconv.ParseInt(string(c.text), 16, 64); return int(n),err }
+Position <- line:Number ':' col:Number ':' idx:Number ':' { return idx.(int), nil }
+Number <- [0-9]+ { n,err := strconv.ParseInt(string(c.text), 0, 64); return int(n), err }
+HexNumber <- [0-9A-F]+ { n,err := strconv.ParseInt(string(c.text), 16, 64); return int(n), err }
 NL <- "\r"? "\n" { return "", nil }
 _ "whitespace" <- ' '
 

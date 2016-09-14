@@ -167,7 +167,7 @@ DEDENT <- #{ state["Indentation"] = state["Indentation"].(int) - 1; return nil }
             markers = [];
             color = 0
             r.forEach(function(e) {
-                coloridx = color % 10 + 1
+                coloridx = color % 20 + 1
                 color += 1
                 bracket_class = "mark_bracket"+coloridx
                 p1 = teditor.session.getDocument().indexToPosition(e.x1,0);
@@ -183,13 +183,21 @@ DEDENT <- #{ state["Indentation"] = state["Indentation"].(int) - 1; return nil }
         var r = [];
         arr.forEach(function(e) {
             if ((e.x1 <= idx) && (idx < e.x2)) {
-                if ((r.length > 0) && (r[0].x1 <= e.x1) && (r[0].x2 >= e.x2)) {
+                if ((r.length > 0) && (r[0].x1 <= e.x1) && (r[0].x2 => e.x2)) {
                     r.unshift(e);
                 } else {
                     r.push(e);
                 }
         }   
         })
+        console.log("arr")
+        arr.forEach(function(e) {
+            console.log(e)
+        });
+        console.log("ranges")
+        r.forEach(function(e) {
+            console.log(e)
+        });
         return r;
     }
 
@@ -197,7 +205,7 @@ DEDENT <- #{ state["Indentation"] = state["Indentation"].(int) - 1; return nil }
         var text = '';
         arr.forEach(function(e) {
             if ((e.x1 <= idx ) && (idx < e.x2)) {
-                if (e.matched)
+                if (e.ismatch)
                     color = 'green'
                 else
                     color = 'gray';
@@ -230,55 +238,46 @@ DEDENT <- #{ state["Indentation"] = state["Indentation"].(int) - 1; return nil }
         }
 
     
-    function mark(x1, x2, text, matched) {
-        entries.push({ x1:x1, x2:x2, text: text, matched: matched})
+    function mark(x1, x2, text, ismatch) {
+        entries.push({ x1:x1, x2:x2, text: text, ismatch: ismatch})
     }
-    
-    function traverse(jsonObj) {
-        if( typeof jsonObj == "object") {
-            $.each(jsonObj, function(k,v) {
-                if ("calls" in v) {
-                    var maxPos = v.detail.pos.Pos;
-                    $.each(v.calls, function(u,r) {
-                        if (r.match !== null) {
-                            maxPos = Math.max(maxPos,r.match.pos.Pos);
-                        }
-                    });
-                    var x2;                    
-                    x1 = v.detail.pos.Pos
-                    if (v.match !== null) {
-                        x2 = v.match.pos.Pos;
-                    } else {
-                        x2 = maxPos;
-                    }
-                    mark(x1, x2, v.detail.name, (v.match !== null) )
-                
-                    traverse(v.calls);                    
-                }
-            });
-        }
-        else {
-            // jsonOb is a number or string
-        }
-    }
-
     var markAllMatches = function(e) {
+        var walk = function(jsonObj) {
+            if( typeof jsonObj == "object") {
+                $.each(jsonObj, function(k,v) {
+                    if ("calls" in v) {
+                        var x2;                    
+                        x1 = v.detail.idx1
+                        if (v.ismatch) {
+                            x2 = v.detail.idx2;
+                        } else {
+                            x2 = v.detail.idx2;
+                        }
+                        mark(x1, x2, v.detail.name, v.ismatch )
+                        
+                        walk(v.calls); 
+                    }
+                });
+            }
+        }
+
         entries = []
-        traverse(e);
+        walk(e);
     };
 
     function genJSONTree(t) {
        var genBlock = function(data) {
             switch($.type(data)) {
                 case 'object':
-                    var node = {text: '', nodes: null};
+                    var node = {text: '', nodes: null, vidx2: 0};
                     var match = '';
-                    if (data.match !== null) {
-                        match = data.match.pos.Pos;
+                    if (data.ismatch) {
+                        match = data.detail.idx2;
                     } else {
                         match = '_'
+                        node.vidx2 = data.detail.idx2;
                     }
-                    node.text = "[" + data.detail.pos.Pos + ',' + match + '] ' + data.detail.name;
+                    node.text = "[" + data.detail.idx1 + ',' + match + '] ' + data.detail.name;
                     node.nodes = genBlock(data.calls);
                     return node
                     
@@ -291,28 +290,13 @@ DEDENT <- #{ state["Indentation"] = state["Indentation"].(int) - 1; return nil }
                     if (nodes.length == 0 )
                         return null;
                     return nodes;
-                /*
-                case 'string':
-                    return data
-
-                case 'number':
-                    return data;
-
-                case 'undefined':
-                    return 'undefined';
-
-                case 'null':
-                    return 'null';
-
-                case 'boolean':
-                    return data;*/
             }
             
        };
        return genBlock(t); 
     }
 
-    var maxidx;
+    //var maxidx;
     var onTreeNodeUnselected = function(event, data) {
         markers.forEach(function(e) {
             teditor.session.removeMarker(e);
@@ -328,7 +312,7 @@ DEDENT <- #{ state["Indentation"] = state["Indentation"].(int) - 1; return nil }
         m = r_nonmatch.exec(data.text)
         if (m !== null) {
             x1 = parseInt(m[1])
-            x2 = maxidx
+            x2 = data.vidx2
             bracket_class = "mark_bracket9"
         }
         m = r_match.exec(data.text)
@@ -337,6 +321,7 @@ DEDENT <- #{ state["Indentation"] = state["Indentation"].(int) - 1; return nil }
             x2 = parseInt(m[2])
             bracket_class = "mark_bracket1"
         }
+                        
         markers.forEach(function(e) {
             teditor.session.removeMarker(e);
         });
@@ -357,7 +342,7 @@ DEDENT <- #{ state["Indentation"] = state["Indentation"].(int) - 1; return nil }
             $('#result_indicator').text('error');
             return;
         }
-        maxidx = t.maxidx
+        //maxidx = t.maxidx
         $('#richtext_output').treeview({data: genJSONTree(t.entries)});
         $('#richtext_output').on('nodeSelected', onTreeNodeSelected);
         $('#richtext_output').on('nodeUnselected', onTreeNodeUnselected);

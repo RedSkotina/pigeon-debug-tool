@@ -80,7 +80,17 @@ div {
 .mark_bracket7 { border:1px solid darkviolet; border-radius:4px; margin: -1px 0 0 -1px; position: absolute; z-index: 6;}
 .mark_bracket8 { border:1px solid indianred; border-radius:4px; margin: -1px 0 0 -1px; position: absolute; z-index: 6;}
 .mark_bracket9 { border:1px solid orangered; border-radius:4px; margin: -1px 0 0 -1px; position: absolute; z-index: 6;}
-.mark_bracket10 { border:1px solid red; border-radius:4px; margin: -1px 0 0 -1px; position: absolute; z-index: 6;}
+.mark_bracket10 { border:1px solid gray; border-radius:4px; margin: -1px 0 0 -1px; position: absolute; z-index: 6;}
+.mark_bracket11 { border:1px solid gray; border-radius:4px; margin: -1px 0 0 -1px; position: absolute; z-index: 6;}
+.mark_bracket12 { border:1px solid gray; border-radius:4px; margin: -1px 0 0 -1px; position: absolute; z-index: 6;}
+.mark_bracket13 { border:1px solid gray; border-radius:4px; margin: -1px 0 0 -1px; position: absolute; z-index: 6;}
+.mark_bracket14 { border:1px solid gray; border-radius:4px; margin: -1px 0 0 -1px; position: absolute; z-index: 6;}
+.mark_bracket15 { border:1px solid gray; border-radius:4px; margin: -1px 0 0 -1px; position: absolute; z-index: 6;}
+.mark_bracket16 { border:1px solid gray; border-radius:4px; margin: -1px 0 0 -1px; position: absolute; z-index: 6;}
+.mark_bracket17 { border:1px solid gray; border-radius:4px; margin: -1px 0 0 -1px; position: absolute; z-index: 6;}
+.mark_bracket18 { border:1px solid gray; border-radius:4px; margin: -1px 0 0 -1px; position: absolute; z-index: 6;}
+.mark_bracket19 { border:1px solid gray; border-radius:4px; margin: -1px 0 0 -1px; position: absolute; z-index: 6;}
+.mark_bracket20 { border:1px solid gray; border-radius:4px; margin: -1px 0 0 -1px; position: absolute; z-index: 6;}
 
 #desk {
   height: 100%;
