@@ -148,12 +148,66 @@ DEDENT <- #{ state["Indentation"] = state["Indentation"].(int) - 1; return nil }
     var entries = [];
     var markers = [];    
 
+    var getRulesByIdx = function(entries,idx) {
+       var walk = function(e) {
+            switch($.type(e)) {
+                case 'object':
+                    found = walk(e.calls);
+                    if (found !== null) {
+                        // revert order
+                        var x = found
+                        while (x.caller !== null) {
+                            x = x.caller
+                        }
+                        e['caller'] = null
+                        x.caller = e
+                        return found;
+                    }
+                    
+                    if (e.ismatch) {
+                        if (e.detail.idx1 <= idx && idx < e.detail.idx2) {
+                            e['caller'] = null
+                            return e;
+                        }
+                    } 
+                    return null
+                    
+                case 'array':
+                    var found = null
+                    $.each(e, function(k,v) {
+                        found = walk(v)
+                        if (found !== null) {
+                            return false; // break each
+                        }
+                    });
+                    if (e.length == 0 )
+                        return null;
+                    return found;
+            }
+            
+       };
+       return walk(entries); 
+    }
+
+    function mergeText(v) {
+        var text = '';
+        var e = v
+        while (e !== null) {
+            if (e.ismatch)
+                color = 'green'
+            else
+                color = 'gray';
+            text += '<font color="'+color+'">' + e.detail.name + '</font><br>';
+            e = e.caller
+        }
+        return text
+    }
     teditor.on("mousemove", function (e){
         var position = e.getDocumentPosition();
         if (position) {
-            posIdx = teditor.session.getDocument().positionToIndex(position,0);
-            r = getRangesByPosIdx(entries,posIdx);
-            var text = mergeTextByPosIdx(r,posIdx);
+            idx = teditor.session.getDocument().positionToIndex(position,0);
+            v = getRulesByIdx(entries,idx);
+            var text = mergeText(v);
             if (text.length > 0) {
                 var pixelPosition = teditor.renderer.textToScreenCoordinates(position);
                 pixelPosition.pageY += teditor.renderer.lineHeight;
@@ -166,62 +220,28 @@ DEDENT <- #{ state["Indentation"] = state["Indentation"].(int) - 1; return nil }
             });
             markers = [];
             color = 0
-            r.forEach(function(e) {
+            g = v
+            while (g !== null) {
                 coloridx = color % 20 + 1
                 color += 1
                 bracket_class = "mark_bracket"+coloridx
-                p1 = teditor.session.getDocument().indexToPosition(e.x1,0);
-                p2 = teditor.session.getDocument().indexToPosition(e.x2,0);
+                p1 = teditor.session.getDocument().indexToPosition(g.detail.idx1,0);
+                p2 = teditor.session.getDocument().indexToPosition(g.detail.idx2,0);
                 range = new Range(p1.row, p1.column, p2.row, p2.column);
                 markers.push(teditor.session.addMarker(range, bracket_class, "text"));
-            });
+                g = g.caller
+            }
+            
             
         }
     });
-
-    function getRangesByPosIdx(arr, idx) {
-        var r = [];
-        arr.forEach(function(e) {
-            if ((e.x1 <= idx) && (idx < e.x2)) {
-                if ((r.length > 0) && (r[0].x1 <= e.x1) && (r[0].x2 => e.x2)) {
-                    r.unshift(e);
-                } else {
-                    r.push(e);
-                }
-        }   
-        })
-        console.log("arr")
-        arr.forEach(function(e) {
-            console.log(e)
-        });
-        console.log("ranges")
-        r.forEach(function(e) {
-            console.log(e)
-        });
-        return r;
-    }
-
-    function mergeTextByPosIdx(arr, idx) {
-        var text = '';
-        arr.forEach(function(e) {
-            if ((e.x1 <= idx ) && (idx < e.x2)) {
-                if (e.ismatch)
-                    color = 'green'
-                else
-                    color = 'gray';
-                text += '<font color="'+color+'">' + e.text + '</font><br>';
-            }
-        });
-        return text
-    }
-
+    
     function updateTooltip(position, text){
-            //example with container creation via JS
             var div = document.getElementById('rule_tooltip_0');
             if(div === null){
                 div = document.createElement('div');        
                 div.setAttribute('id', 'rule_tooltip_0'); 
-                div.setAttribute('class', 'rule_tooltip'); // and make sure myclass has some styles in css
+                div.setAttribute('class', 'rule_tooltip'); 
                 document.body.appendChild(div);
             }
 
@@ -237,36 +257,8 @@ DEDENT <- #{ state["Indentation"] = state["Indentation"].(int) - 1; return nil }
 
         }
 
-    
-    function mark(x1, x2, text, ismatch) {
-        entries.push({ x1:x1, x2:x2, text: text, ismatch: ismatch})
-    }
-    var markAllMatches = function(e) {
-        var walk = function(jsonObj) {
-            if( typeof jsonObj == "object") {
-                $.each(jsonObj, function(k,v) {
-                    if ("calls" in v) {
-                        var x2;                    
-                        x1 = v.detail.idx1
-                        if (v.ismatch) {
-                            x2 = v.detail.idx2;
-                        } else {
-                            x2 = v.detail.idx2;
-                        }
-                        mark(x1, x2, v.detail.name, v.ismatch )
-                        
-                        walk(v.calls); 
-                    }
-                });
-            }
-        }
-
-        entries = []
-        walk(e);
-    };
-
     function genJSONTree(t) {
-       var genBlock = function(data) {
+       var genNode = function(data) {
             switch($.type(data)) {
                 case 'object':
                     var node = {text: '', nodes: null, vidx2: 0};
@@ -278,13 +270,13 @@ DEDENT <- #{ state["Indentation"] = state["Indentation"].(int) - 1; return nil }
                         node.vidx2 = data.detail.idx2;
                     }
                     node.text = "[" + data.detail.idx1 + ',' + match + '] ' + data.detail.name;
-                    node.nodes = genBlock(data.calls);
+                    node.nodes = genNode(data.calls);
                     return node
                     
                 case 'array':
                     var nodes = [];
                     $.each(data, function(k,v) {
-                        node = genBlock(v)
+                        node = genNode(v)
                         nodes.push(node)
                     });
                     if (nodes.length == 0 )
@@ -293,10 +285,9 @@ DEDENT <- #{ state["Indentation"] = state["Indentation"].(int) - 1; return nil }
             }
             
        };
-       return genBlock(t); 
+       return genNode(t); 
     }
 
-    //var maxidx;
     var onTreeNodeUnselected = function(event, data) {
         markers.forEach(function(e) {
             teditor.session.removeMarker(e);
@@ -331,22 +322,20 @@ DEDENT <- #{ state["Indentation"] = state["Indentation"].(int) - 1; return nil }
         range = new Range(p1.row, p1.column, p2.row, p2.column);
         markers.push(teditor.session.addMarker(range, bracket_class, "text"));
     }
+    
     var start_time = 0;
     ws.onmessage = function (msg) {
-    	//output.innerText = msg.data;
-        output.innerText = "";
+    	output.innerText = "";
         t = JSON.parse(msg.data);
-        console.log(t.errors)
         if (t.errors != "") {
             $('#richtext_output').text(t.errors)
             $('#result_indicator').text('error');
             return;
         }
-        //maxidx = t.maxidx
         $('#richtext_output').treeview({data: genJSONTree(t.entries)});
         $('#richtext_output').on('nodeSelected', onTreeNodeSelected);
         $('#richtext_output').on('nodeUnselected', onTreeNodeUnselected);
-        markAllMatches(t.entries)
+        entries = t.entries
         exec_time = performance.now() - start_time;
         $('#result_indicator').text(Math.round(exec_time) + 'ms');
     };
