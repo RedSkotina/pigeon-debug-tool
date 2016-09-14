@@ -311,7 +311,41 @@ DEDENT <- #{ state["Indentation"] = state["Indentation"].(int) - 1; return nil }
        };
        return genBlock(t); 
     }
-    
+
+    var maxidx;
+    var onTreeNodeUnselected = function(event, data) {
+        markers.forEach(function(e) {
+            teditor.session.removeMarker(e);
+        });
+        markers = []
+    }
+    var onTreeNodeSelected = function(event, data) {
+        var x1 = 0
+        var x2 = 0
+        bracket_class = ""
+        var r_nonmatch = /^\[(\d+),_\].+/i
+        var r_match = /^\[(\d+),(\d+)\].+/i
+        m = r_nonmatch.exec(data.text)
+        if (m !== null) {
+            x1 = parseInt(m[1])
+            x2 = maxidx
+            bracket_class = "mark_bracket9"
+        }
+        m = r_match.exec(data.text)
+        if ( m !== null) {
+            x1 = parseInt(m[1])
+            x2 = parseInt(m[2])
+            bracket_class = "mark_bracket1"
+        }
+        markers.forEach(function(e) {
+            teditor.session.removeMarker(e);
+        });
+        markers = []
+        p1 = teditor.session.getDocument().indexToPosition(x1,0);
+        p2 = teditor.session.getDocument().indexToPosition(x2,0);
+        range = new Range(p1.row, p1.column, p2.row, p2.column);
+        markers.push(teditor.session.addMarker(range, bracket_class, "text"));
+    }
     var start_time = 0;
     ws.onmessage = function (msg) {
     	//output.innerText = msg.data;
@@ -323,7 +357,10 @@ DEDENT <- #{ state["Indentation"] = state["Indentation"].(int) - 1; return nil }
             $('#result_indicator').text('error');
             return;
         }
+        maxidx = t.maxidx
         $('#richtext_output').treeview({data: genJSONTree(t.entries)});
+        $('#richtext_output').on('nodeSelected', onTreeNodeSelected);
+        $('#richtext_output').on('nodeUnselected', onTreeNodeUnselected);
         markAllMatches(t.entries)
         exec_time = performance.now() - start_time;
         $('#result_indicator').text(Math.round(exec_time) + 'ms');

@@ -102,8 +102,8 @@ func generateParser(msg string) (bytes.Buffer, error) {
 	pigeon.Stderr = &pigerr
 	err := pigeon.Run()
 	if err != nil {
-		log.Printf("PIGEON STDERR: %v", pigerr.String())
-		return *bytes.NewBufferString("PIGEON STDERR: "+pigerr.String()), err
+		log.Printf("generateParser pigeon: %v", pigerr.String())
+		return *bytes.NewBufferString("generateParser pigeon: "+pigerr.String()), err
 	}
 	var impin, impout, imperr bytes.Buffer
 	goimports := exec.Command("goimports")
@@ -113,8 +113,8 @@ func generateParser(msg string) (bytes.Buffer, error) {
 	goimports.Stderr = &imperr
 	err = goimports.Run()
 	if err != nil {
-		log.Printf("GOIMPORTS STDERR: %v", imperr.String())
-		return *bytes.NewBufferString("GOIMPORTS STDERR: "+imperr.String()), err
+		log.Printf("generateParser goimports: %v", imperr.String())
+		return *bytes.NewBufferString("generateParser goimports: "+imperr.String()), err
 	}
 	return impout, nil
 }
@@ -133,9 +133,9 @@ func runParser(source bytes.Buffer, test string) (bytes.Buffer, error) {
 	tmpfilename := TempFileName("pigeon", ".go")
 	err := ioutil.WriteFile(tmpfilename, source.Bytes(), 0644)
 	if err != nil {
-		log.Printf("GO RUN ERROR(WriteFile): %v", err.Error())
+		log.Printf("runParser(WriteFile): %v", err.Error())
 		//runout.Write(runerr.Bytes())
-		return *bytes.NewBufferString("GO RUN STDERR(WriteFile): "+err.Error()), err
+		return *bytes.NewBufferString("runParser(WriteFile): "+err.Error()), err
 	}
 	defer os.Remove(tmpfilename)
 
@@ -177,17 +177,8 @@ func analyzeTrace(b bytes.Buffer) (Ttrace, error) {
 	return ftrace, nil
 }
 
-func buildResponse(trace Ttrace) ([]byte, error) {
-	//log.Printf("%v\n", ftrace)
-	jtrace, err := json.Marshal(trace)
-	if err != nil {
-		log.Printf("Cant marshal json\n")
-		return bytes.NewBufferString("BUILD JSON: Cant marshal json").Bytes(), err
-	}
-	return jtrace, nil
-}
-
 func filterTrace(t Ttrace) Ttrace {
+	maxIdx := 0
 	var walk  func(e Tentry) []Tentry;
 	walk = func(e Tentry) []Tentry {
 		res := []Tentry{}
@@ -203,6 +194,9 @@ func filterTrace(t Ttrace) Ttrace {
 			strings.HasPrefix(e.Detail.Name, "OneOrMoreExpr ") ||
 			strings.HasPrefix(e.Detail.Name, "ZeroOrMoreExpr ") ) {
 			e.Calls = fcalls
+			if e.Match != nil {
+				maxIdx = max(maxIdx, e.Match.Pos.Pos)
+			}
 			res = append(res, e)
 		} else {
 			res = fcalls
@@ -215,8 +209,20 @@ func filterTrace(t Ttrace) Ttrace {
 		g := walk(v)
 		r = append(r, g...)
 	}
-	return Ttrace{Entries: r}
+	return Ttrace{Entries: r, MaxIdx: maxIdx}
 }
+
+func buildResponse(trace Ttrace) ([]byte, error) {
+	//log.Printf("%v\n", ftrace)
+	jtrace, err := json.Marshal(trace)
+	if err != nil {
+		log.Printf("buildResponse: Cant marshal json\n")
+		return bytes.NewBufferString("BUILD JSON: Cant marshal json").Bytes(), err
+	}
+	return jtrace, nil
+}
+
+
 
 func getHTTPAddr() string {
 	host, port, err := net.SplitHostPort(*httpListen)
@@ -273,6 +279,13 @@ func startBrowser(url string) bool {
 	}
 	cmd := exec.Command(args[0], append(args[1:], url)...)
 	return cmd.Start() == nil
+}
+
+func max(a int, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 func track(start time.Time, name string) {

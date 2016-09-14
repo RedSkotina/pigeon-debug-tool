@@ -72,6 +72,7 @@ type Tentry struct {
 type Ttrace struct {
     Entries []Tentry `json:"entries"`
     Errors string    `json:"errors"`
+    MaxIdx int       `json:"maxidx"`
 }
 
 func toMatchRef(m interface{}) *Tmatch {
@@ -84,7 +85,7 @@ func toMatchRef(m interface{}) *Tmatch {
 
 }
 
-Trace <- #{state["indent"]=1; return nil} lines:(TraceLine)* { return Ttrace{IfaceSliceToEntrySlice(toIfaceSlice(lines)),""},nil }
+Trace <- #{state["indent"]=1; return nil} lines:(TraceLine)* { return Ttrace{IfaceSliceToEntrySlice(toIfaceSlice(lines)),"", 0},nil }
 TraceLine <- INDENTATION entry:TraceEntry  { return entry,nil }
 
 TraceEntry <-  INDENT enter:EnterParseEntry calls:(TraceEntry / RestoreEntry)* match:MatchEntry? DEDENT ExitParseEntry 
