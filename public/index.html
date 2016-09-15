@@ -29,7 +29,7 @@
                 </label>
                 <div id="richtext_grammar_container" class="richtext_container overflow_handler">
                     <div id="richtext_grammar" class="richtext">
-{
+{ 
 func toIfaceSlice(v interface{}) []interface{} {
     if v == nil {
         return nil
@@ -41,22 +41,22 @@ func toIfaceSlice(v interface{}) []interface{} {
 DmUnit <- 
     #{ state["Indentation"] = 0; return nil }  Statements EOF
 
-Statements  <- 
+Statements  <-  
     s:Line+
 
 Line <-
-    INDENTATION s:Statement
+    s:Statement
 
 Statement <- 
      ObjDeclaration
 
-ObjDeclaration <- 
-    ObjIdentifier ObjBlock
+ObjDeclaration <-
+    ObjIdentifier  INDENT ObjBlock+  DEDENT
 ObjIdentifier <-
     Slash? (atom / datum / Identifier) (Slash (atom / datum / Identifier))* EOL
 ObjBlock <-
-    INDENT INDENTATION ((ObjDeclaration / ObjBlockStatement ) EOL+)+ DEDENT
-
+      INDENTATION ( ObjDeclaration / ( ObjBlockStatement EOL))+ EOL*
+ 
 Slash <- "/"
 atom <-
     "atom"
@@ -73,7 +73,7 @@ datum <-
 ObjBlockStatement <-
      VarAssignment
 Identifier <-
-     [a-zA-Z] [a-zA-Z0-9]* 
+     [a-zA-Z_] [a-zA-Z0-9_]*
 
 VarAssignment <-
      LValue _ AssignmentOp _ VarInitializer
@@ -81,10 +81,9 @@ LValue <- Identifier
 AssignmentOp <- "="
 VarInitializer <- [0-9]
 
-
 _ <- [ \t]+
 
-EOL <- _? ( NL / EOF)
+EOL <- _? NL 
 NL  <- "\r\n" / "\n\r" / "\r" / "\n"
 EOF <- !.
 
@@ -101,12 +100,11 @@ DEDENT <- #{ state["Indentation"] = state["Indentation"].(int) - 1; return nil }
                     <div id="richtext_test" class="richtext">turf
 	floor
 		icon = 1
-
 	wall
 		icon = 0
 		density = 1
 		opacity = 1
-
+		
 		secret_door
 			name = 0
 			density = 0
@@ -149,19 +147,28 @@ DEDENT <- #{ state["Indentation"] = state["Indentation"].(int) - 1; return nil }
     var markers = [];    
 
     var getRulesByIdx = function(entries,idx) {
-       var walk = function(e) {
+        var isTransientRule = function(e) {
+            if (e.detail.name == "ZeroOrOneExpr " ||
+                e.detail.name == "OneOrMoreExpr " ||
+                e.detail.name == "ZeroOrMoreExpr ")
+                return true;
+            return false;
+        }
+        var walk = function(e) {
             switch($.type(e)) {
                 case 'object':
                     found = walk(e.calls);
                     if (found !== null) {
-                        // revert order
-                        var x = found
-                        while (x.caller !== null) {
-                            x = x.caller
+                        if (e.ismatch || isTransientRule(e)) {
+                            // revert order
+                            var x = found
+                            while (x.caller !== null) {
+                                x = x.caller
+                            }
+                            e['caller'] = null
+                            x.caller = e
+                            return found;
                         }
-                        e['caller'] = null
-                        x.caller = e
-                        return found;
                     }
                     
                     if (e.ismatch) {

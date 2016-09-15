@@ -36,7 +36,7 @@ type Msg struct {
 func main() {
 	r := gin.Default()
 	m := melody.New()
-	m.Config.MaxMessageSize = 1048576
+	m.Config.MaxMessageSize = 10048576
 
 	r.Use(static.Serve("/", static.LocalFile("./public", true)))
 
