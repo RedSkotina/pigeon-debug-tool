@@ -110,6 +110,7 @@ INDENTATION <- spaces:"\t"* &{ return len(toIfaceSlice(spaces)) == state["Indent
 INDENT <- #{ state["Indentation"] = state["Indentation"].(int) + 1; return nil }
 
 DEDENT <- #{ state["Indentation"] = state["Indentation"].(int) - 1; return nil }</div>
+                </div>
             </div>
             <div id="test_container" class="flex-text">
                 <label for="richtext_test_container">Test string</label>
