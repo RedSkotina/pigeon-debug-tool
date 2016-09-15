@@ -29,14 +29,14 @@
                 </label>
                 <div id="richtext_grammar_container" class="richtext_container overflow_handler">
                     <div id="richtext_grammar" class="richtext">
-{ 
+{
 func toIfaceSlice(v interface{}) []interface{} {
     if v == nil {
         return nil
     }
     return v.([]interface{})
 }
-}
+} 
 
 DmUnit <- 
     #{ state["Indentation"] = 0; return nil }  Statements EOF
@@ -45,18 +45,20 @@ Statements  <-
     s:Line+
 
 Line <-
-    s:Statement
-
-Statement <- 
-     ObjDeclaration
-
-ObjDeclaration <-
-    ObjIdentifier  INDENT ObjBlock+  DEDENT
-ObjIdentifier <-
-    Slash? (atom / datum / Identifier) (Slash (atom / datum / Identifier))* EOL
-ObjBlock <-
-      INDENTATION ( ObjDeclaration / ( ObjBlockStatement EOL))+ EOL*
+    s:Statement 
  
+Statement <- 
+    ObjDeclaration 
+    / VarAssignment
+    / ProcDeclaration
+    / EOL
+ObjDeclaration <-
+    ObjIdentifier  EOL INDENT ObjBlock+  DEDENT
+ObjIdentifier <- 
+    Slash? (atom / datum / Identifier) (Slash (atom / datum / Identifier))* 
+ObjBlock <-
+      INDENTATION ( ObjDeclaration / ObjBlockStatement )+ EOL*
+
 Slash <- "/"
 atom <-
     "atom"
@@ -69,18 +71,34 @@ datum <-
   /  "world"
   /  "client"
   /  "list"
-
+ 
 ObjBlockStatement <-
-     VarAssignment
+    (VarAssignment EOL)
+    / ProcDeclaration
+    
 Identifier <-
-     [a-zA-Z_] [a-zA-Z0-9_]*
+    [a-zA-Z_] [a-zA-Z0-9_]*
 
 VarAssignment <-
-     LValue _ AssignmentOp _ VarInitializer
-LValue <- Identifier
+    LValue _ AssignmentOp _ VarInitializer
+
+LValue <- ObjIdentifier
 AssignmentOp <- "="
 VarInitializer <- [0-9]
 
+ProcDeclaration <-
+    ObjIdentifier '(' ArgumentsList? ')'  EOL INDENT ProcBlock DEDENT
+ArgumentsList <-
+    _? Argument _? (',' _? Argument _? )* 
+Argument <-
+    Expression
+Expression <-
+    Identifier
+ProcBlock <-
+    INDENTATION ( BlockStatement EOL)+ EOL*
+BlockStatement <-
+    VarAssignment
+    
 _ <- [ \t]+
 
 EOL <- _? NL 
@@ -97,9 +115,17 @@ DEDENT <- #{ state["Indentation"] = state["Indentation"].(int) - 1; return nil }
             <div id="test_container" class="flex-text">
                 <label for="richtext_test_container">Test string</label>
                 <div id="richtext_test_container" class="richtext_container overflow_handler">
-                    <div id="richtext_test" class="richtext">turf
+                    <div id="richtext_test" class="richtext">/atom/var/smooth = 0
+/obj/screen/human/toggle/Click()
+	density = 1
+
+turf
 	floor
+		var/x = 1
 		icon = 1
+		proc/p1(x)
+			var/z = 2
+
 	wall
 		icon = 0
 		density = 1
