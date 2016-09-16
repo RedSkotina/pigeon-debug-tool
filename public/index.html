@@ -357,6 +357,7 @@ turf
     }
     
     var start_time = 0;
+    var idle_timer = null
     ws.onmessage = function (msg) {
     	output.innerText = "";
         t = JSON.parse(msg.data);
@@ -373,10 +374,15 @@ turf
         $('#result_indicator').text(Math.round(exec_time) + 'ms');
     };
     geditor.on("change", function (e) {
-        jmsg = JSON.stringify({ grammar: geditor.session.getDocument().getValue(), test_string: teditor.session.getDocument().getValue() })
-        start_time = performance.now();
-        $('#result_indicator').text('wait');
-        ws.send(jmsg);
+        if (idle_timer !== null)
+            clearTimeout(idle_timer);
+        var send = function() {
+            jmsg = JSON.stringify({ grammar: geditor.session.getDocument().getValue(), test_string: teditor.session.getDocument().getValue() })
+            start_time = performance.now();
+            $('#result_indicator').text('wait');
+            ws.send(jmsg);
+        }
+        idle_timer = setTimeout(send,2000)
     });
 
     </script>
