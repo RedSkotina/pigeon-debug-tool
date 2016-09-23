@@ -168,28 +168,8 @@ div {
   overflow-y: scroll !important;
   /*position: absolute !important;*/
 }
-#richtext_test, #richtext_grammar{
-  /*
-  resize: none !important;
-  background: transparent !important;
-  position: relative !important;
-  outline: 0 !important;
-  margin: 0 !important;
-  padding: 5px !important;
-  border: 0 !important;
-  width: 100% !important;
-  font-weight: 400 !important;
-  font-style: normal !important;
-  height: 100% !important;
-  z-index: 800 !important;
-  background: transparent !important;
-  position: relative !important;
-  top: 0 !important;
-  font-family: Monaco,Consolas,'Lucida Console',monospace;
-  font-size: 14px;
-  */
-  /*overflow: scroll !important;*/
-  
+#richtext_test {
+   min-height: 55%;
 }
 
 #info_desk {
@@ -297,7 +277,7 @@ div {
   -moz-box-flex: 1;
   -webkit-flex: 1 0 auto;
   -ms-flex: 1 0 auto;
-  flex: 1 0 auto;
+  flex: 0 0 auto;
   position: relative;
 }
 

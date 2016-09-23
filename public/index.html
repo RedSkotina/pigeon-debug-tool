@@ -112,7 +112,7 @@ INDENT <- #{ state["Indentation"] = state["Indentation"].(int) + 1; return nil }
 DEDENT <- #{ state["Indentation"] = state["Indentation"].(int) - 1; return nil }</div>
                 </div>
             </div>
-            <div id="test_container" class="flex-text">
+            <div id="test_container" class="flex-text scroll_y">
                 <label for="richtext_test_container">Test string</label>
                 <div id="richtext_test_container" class="richtext_container overflow_handler">
                     <div id="richtext_test" class="richtext">/atom/var/smooth = 0
@@ -161,7 +161,7 @@ turf
     
     var geditor = ace.edit("richtext_grammar");
     geditor.setTheme("ace/theme/chrome");
-
+    //editor.getSession().setMode("ace/mode/pegjs");
     var teditor = ace.edit("richtext_test");
     teditor.setTheme("ace/theme/chrome");
     //editor.getSession().setMode("ace/mode/javascript");
