@@ -38,77 +38,157 @@ func toIfaceSlice(v interface{}) []interface{} {
 }
 } 
 
-DmUnit <- 
-    #{ state["Indentation"] = 0; return nil }  Statements EOF
-
-Statements  <-  
-    s:Line+
-
-Line <-
-    s:Statement 
+RootNode <- #{ state["Indentation"] = 0; return nil } (RootStatement)+ EOF
+RootStatement <- Node / VarNode / FunctionNode
+Node <-  ( Slash? ( ( IsNode Identifier Slash Node) / (IsNode Identifier EOL+ INDENT (INDENTATION Node EOL*)* DEDENT)) )  / NodeStatement
+NodeStatement <- VarNode / ProcNode / VerbNode / FunctionNode / EOL
+IsNode <- !"var" !"proc" !"verb"
+Assignment <- LValue _? AssignmentOp _? Initializer
+LValue <- ArrayAccess / VarDefinition
+AssignmentOp <- [-+*/]? "=" 
+Initializer <- Expression
  
-Statement <- 
-    ObjDeclaration 
-    / VarAssignment
-    / ProcDeclaration
-    / EOL
-ObjDeclaration <-
-    ObjIdentifier  EOL INDENT ObjBlock+  DEDENT
-ObjIdentifier <- 
-    Slash? (atom / datum / Identifier) (Slash (atom / datum / Identifier))* 
-ObjBlock <-
-      INDENTATION ( ObjDeclaration / ObjBlockStatement )+ EOL*
+VarNode <-  Slash? ( ("var" Slash VarNodeScope) / ("var" EOL+ INDENT (INDENTATION VarNodeScope)* DEDENT) ) / (Assignment EOL)
+VarNodeScope <- (Identifier Slash VarNodeType) / (Identifier EOL+ INDENT (INDENTATION VarNodeType)* DEDENT) / VarNodeType
+VarNodeType <- (Identifier Slash VarNodeStatement) / (Identifier EOL+ INDENT (INDENTATION VarNodeStatement)* DEDENT) / VarNodeStatement
+VarNodeStatement <- ( Assignment / ListVariable / SimpleVariable  ) EOL
+SimpleVariable <- Identifier
+ListVariable <- Identifier ('[' _? Expression? _?']')+
 
-Slash <- "/"
-atom <-
-    "atom"
-  / "area"
-  / "turf"
-  / "obj"
-  / "mob"
-datum <-
-     "datum"
-  /  "world"
-  /  "client"
-  /  "list"
- 
-ObjBlockStatement <-
-    (VarAssignment EOL)
-    / ProcDeclaration
+ProcNode <- Slash? ( ("proc" Slash FunctionNode) / ("proc" EOL+ INDENT (INDENTATION FunctionNode)* DEDENT) ) 
+VerbNode <- Slash? ( ("verb" Slash FunctionNode) / ("verb" EOL+ INDENT (INDENTATION FunctionNode)* DEDENT) ) 
+
+FunctionNode <- Identifier '(' ArgumentsList? ')'  EOL+ INDENT (INDENTATION (FunctionStatement) EOL*)+ EOL* DEDENT
+
+FunctionStatement <- VarNode / ReturnStatement / IfStatement / Assignment / OutputInstruction / InputInstruction 
+                    / DelInstruction / SleepInstruction / SpawnInstruction / ForStatement / SwitchStatement / CallStatement / EOL
+
+ReturnStatement <- "return" _ (Expression)?
+CallStatement <- Expression
+DelInstruction <- "del" _ VarDefinition
+SleepInstruction <- "sleep" '(' _? Constant _? ')' LoopBlock
+SpawnInstruction <- "spawn" _? '(' _? Constant _? ')' LoopBlock
+InputInstruction  <- "input" '(' _? Expression _? ','_? Expression _? ','_? Expression _? ','_? Expression ')' "as input-type in List"
+OutputInstruction <- OutputTarget _? "<<" _? OutputMethod
+OutputTarget <- PrefixExpression
+OutputMethod <- StringLiteral / (("text" / "file" / "image" / "browse" / "sound" / "ftp" / "run" / "link") "()")
+
+IfStatement <- IfGroup ElIfGroup* ElseGroup?      
+IfGroup         <- "if" _? '(' _? Expression _? ')' LoopBlock  
+ElIfGroup       <-  INDENTATION "else if" _? '(' _? Expression _? ')' LoopBlock
+ElseGroup       <-  INDENTATION "else" LoopBlock
+
+SwitchStatement <- "switch" '(' _? Expression _? ')' SwitchBlock
+SwitchBlock <- EOL+ INDENT (INDENTATION CaseStatement)+ DEDENT
+CaseStatement <- CaseIfStatement / CaseElseStatement
+CaseIfStatement <- "if" _? '(' _? Constant _? ')' LoopBlock
+CaseElseStatement <- "else" LoopBlock
+
+ForStatement <- ForEachStatement / ForConditionalStatement / WhileStatement / DoWhileStatement
+ForEachStatement <- "for" '(' _? ForEachVariable (_ "as" _ ForEachInputType)? _ "in" _ ForEachList ')' LoopBlock
+ForEachVariable <- VarDefinition
+ForEachInputType <- InputType
+ForEachList <- PrimaryExpression
+ForConditionalStatement <- "for" '(' _? (VarNode / Assignment) _? (';'/',') _? ConditionalExpression _? (';'/',') _? Expression _? ')'  LoopBlock
+WhileStatement <- "while" '(' _? ConditionalExpression _? ')' LoopBlock
+DoWhileStatement <- "do" LoopBlock "while" '(' _? ConditionalExpression _?')' EOL
+
+LoopBlock <- (EOL+ INDENT (INDENTATION LoopStatement EOL*)+   DEDENT) / ( _ LoopStatement EOL*)
+LoopStatement <- "break"  / "continue" / FunctionStatement
+
+Expression              <- v:ConditionalExpression                
+ConditionalExpression   <- v:LogicalOrExpression ( _? '?' _? Expression _? ":" _? Expression )? 
+LogicalOrExpression     <- v:LogicalAndExpression rest:( _? "||" _? LogicalAndExpression )*                  
+LogicalAndExpression    <- v:InclusiveOrExpression rest:( _? "&&" _? InclusiveOrExpression )*                
+InclusiveOrExpression   <- v:ExclusiveOrExpression rest:( _? '|' _? ExclusiveOrExpression )*                 
+ExclusiveOrExpression   <- v:AndExpression rest:( _? '^' _? AndExpression )*                                 
+AndExpression           <- v:EqualityExpression rest:( _? '&' _? EqualityExpression )*                       
+EqualityExpression      <- v:ShiftExpression rest:( _? ( "==" / "!=" / "<>" ) _? ShiftExpression )*          
+ShiftExpression         <- v:RelationalExpression rest:( _? ( "<<" / ">>" ) _? RelationalExpression )*       
+RelationalExpression    <- v:ContainExpression rest:( _? ( ">=" / "<=" / '>' / '<' ) _? ContainExpression )*  
+ContainExpression       <- v:AdditiveExpression rest:( _ ( "in" ) _ AdditiveExpression )* 
+AdditiveExpression      <- v:MultiplicativeExpression rest:( _? ( '+' / '-' ) _? MultiplicativeExpression )* 
+MultiplicativeExpression <- v:PowerExpression rest:( _? ( '*' / '/' / '%' ) _? PowerExpression )*          
+PowerExpression         <- v:UnaryExpression rest:( _? ( "**" ) _? UnaryExpression )*          
+UnaryExpression        <- u:(UnaryOperator?) v:PostfixExpression     
+UnaryOperator           <- ( '!' / '~' / "++" / "--" / '-' )
+PostfixExpression        <- v:PrefixExpression rest:( "++" / "--" )?
+PrefixExpression       <- MethodCall
+MethodCall <- ArrayAccess ( "(" ExpressionList? ")" )*
+ArrayAccess <- MemberAccess ( "[" Expression "]" )*
+MemberAccess <- PrimaryExpression ( "." Identifier)*
+PrimaryExpression       <- 
+                        FloatLiteral
+                        / IntegerLiteral     
+                        / CharacterLiteral
+                        / StringLiteral
+                        / ('(' _?  v:Expression _? ')' )
+                        / v:Identifier
+                        / v:VarDefinition
+                        / v:VarAbsDefinition
+                        / '.'
+
+Constant                <- PrimaryExpression
+
+InputTypeCombination <- InputType ('|' InputType)*
+InputType <- "text" / "message" / "num" / "icon" / "sound" 
+            / "file" / "key" / "null" / "mob" / "obj"
+            / "turf" / "area" / "anything"
+
+VarDefinition <- Identifier (Slash Identifier)*
+VarAbsDefinition <- (Slash Identifier)+
+
+ArgumentsList <-  _? Argument _? (',' _? Argument _? )* 
+Argument <- ArgumentName (_? "=" _? ArgumentDefaultValue)? (_ "as" _ ArgumentType ("|"ArgumentAnythingType)? (_ "in" _ ArgumentLimitList)?)?
+ArgumentName <- VarDefinition
+ArgumentDefaultValue <- PrimaryExpression 
+ArgumentType <- Identifier
+ArgumentAnythingType <- "anything"
+ArgumentLimitList <- Expression
+
+ExpressionList          <- InitializerList
+InitializerList         <- _? InitializerClause _? (',' _? InitializerClause _? )*
+InitializerClause       <- AssignmentExpression / ConditionalExpression 
+AssignmentExpression    <-  ConditionalExpression _? '=' _? ConditionalExpression
+                        
+IntegerLiteral          <- DecimalLiteral / OctalLiteral / HexadecimalLiteral
+DecimalLiteral          <- NonzeroDigit Digit*         { v,err := strconv.ParseInt(string(c.text), 0, 64); return int(v),err }
+OctalLiteral            <- '0' OctalDigit*             { v,err := strconv.ParseInt(string(c.text), 0, 64); return int(v),err }
+HexadecimalLiteral      <- '0' [xX]  HexadecimalDigit+ { v,err := strconv.ParseInt(string(c.text), 0, 64); return int(v),err }
+Digit <- [0-9]
+NonzeroDigit <- [1-9]
+OctalDigit <- [0-7]	
+
+FloatLiteral <- FractionalConstant ExponentPart? / Digit+ ExponentPart
+FractionalConstant <-  (Digit* '.' Digit+)  / (Digit+ '.')
+ExponentPart <- [eE] Sign? Digit+
+
+StringLiteral   <- '"'  val:SCharSequence? '"'                   
+SCharSequence   <- val:SChar+                                    
+SChar           <- val:(EmbeddedLiteral / EscapeSequence / AnyExceptNlDqBs)     
+AnyExceptNlDqBs <- [^\x0d\x0a"\\]                                               
+EscapeSequence          <- (SimpleEscapeSequence / HexadecimalEscapeSequence)   
+SimpleEscapeSequence    <- '\\' ["[\]\\/bfnrt]
+HexadecimalEscapeSequence <- '\\' 'x' HexadecimalDigit+
+HexadecimalDigit        <- [0-9a-f]i
+EmbeddedLiteral    <- '[' _? val:EmbeddedExpr _? ']' 
+EmbeddedExpr <- !']' v:Expression 
+
+CharacterLiteral <- "'" CCharSequence "'"                        
+CCharSequence    <- CChar+
+CChar            <- EscapeSequence / AnyExceptNlSqBs 
+AnyExceptNlSqBs <- [^\x0d\x0a'\\]
+
+Identifier <- [a-zA-Z_] [a-zA-Z0-9_]*
     
-Identifier <-
-    [a-zA-Z_] [a-zA-Z0-9_]*
-
-VarAssignment <-
-    LValue _ AssignmentOp _ VarInitializer
-
-LValue <- ObjIdentifier
-AssignmentOp <- "="
-VarInitializer <- [0-9]
-
-ProcDeclaration <-
-    ObjIdentifier '(' ArgumentsList? ')'  EOL INDENT ProcBlock DEDENT
-ArgumentsList <-
-    _? Argument _? (',' _? Argument _? )* 
-Argument <-
-    Expression
-Expression <-
-    Identifier
-ProcBlock <-
-    INDENTATION ( BlockStatement)+ EOL*
-BlockStatement <-
-    VarAssignment EOL
-    
+Slash <- '/'
 _ <- [ \t]+
-
 EOL <- _? NL 
 NL  <- "\r\n" / "\n\r" / "\r" / "\n"
 EOF <- !.
 
 INDENTATION <- spaces:"\t"* &{ return len(toIfaceSlice(spaces)) == state["Indentation"].(int), nil }
-
 INDENT <- #{ state["Indentation"] = state["Indentation"].(int) + 1; return nil }
-
 DEDENT <- #{ state["Indentation"] = state["Indentation"].(int) - 1; return nil }</div>
                 </div>
             </div>
@@ -174,9 +254,9 @@ turf
 
     var getRulesByIdx = function(entries,idx) {
         var isTransientRule = function(e) {
-            if (e.detail.name == "ZeroOrOneExpr " ||
-                e.detail.name == "OneOrMoreExpr " ||
-                e.detail.name == "ZeroOrMoreExpr ")
+            if (e.detail.name == "ZeroOrOneExpr" ||
+                e.detail.name == "OneOrMoreExpr" ||
+                e.detail.name == "ZeroOrMoreExpr")
                 return true;
             return false;
         }
@@ -213,6 +293,7 @@ turf
                             return false; // break each
                         }
                     });
+                            
                     if (e.length == 0 )
                         return null;
                     return found;

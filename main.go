@@ -33,6 +33,26 @@ type Msg struct {
 	TestString string `json:"test_string"`
 }
 
+// TDetail information about entry
+type TDetail struct {
+	Idx1 int    `json:"idx1"`
+	Idx2 int    `json:"idx2"`
+	Name string `json:"name"`
+}
+
+// TEntry element of trace
+type TEntry struct {
+	Detail  TDetail  `json:"detail"`
+	Calls   []TEntry `json:"calls"`
+	IsMatch bool     `json:"ismatch"`
+}
+
+// TTrace root of entries
+type TTrace struct {
+	Entries []TEntry `json:"entries"`
+	Errors  string   `json:"errors"`
+}
+
 func main() {
 	r := gin.Default()
 	m := melody.New()
@@ -121,7 +141,7 @@ func generateParser(msg string) (bytes.Buffer, error) {
 
 const mainFunc = `
 func main() {
-	_, err := ParseReader("stdin", os.Stdin, Debug(true))
+	_, err := ParseReader("stdin", os.Stdin, JDebug(true))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -136,7 +156,7 @@ func runParser(source bytes.Buffer, test string) (bytes.Buffer, error) {
 		//runout.Write(runerr.Bytes())
 		return *bytes.NewBufferString("runParser(WriteFile): " + err.Error()), err
 	}
-	defer os.Remove(tmpfilename)
+	//defer os.Remove(tmpfilename)
 
 	//log.Printf("go run %v", tmpfilename)
 	var runout, runerr bytes.Buffer
@@ -156,50 +176,25 @@ func runParser(source bytes.Buffer, test string) (bytes.Buffer, error) {
 }
 
 func analyzeTrace(b bytes.Buffer) (TTrace, error) {
-	s := strings.Replace(b.String(), "\ufffd", "?", -1) // fix pigeon bug
+	s := strings.Replace(b.String(), "\ufffd", "?", -1) // fix pigeon bug . useless with json-pigeon
 	b.Reset()
 	b.WriteString(s)
-	//log.Printf("%v\n", trace.String())
-	got, err := ParseReader("", &b)
-	if err != nil {
-		log.Fatal(err)
+	//log.Printf("%v\n", b.String())
+
+	sp := strings.Split(b.String(), "\n")
+	if len(sp) > 1 {
+		b.Reset()
+		b.WriteString(sp[0])
+	}
+
+	var got TTrace
+	if err := json.Unmarshal(b.Bytes(), &got); err != nil {
+		log.Println(err)
 		return TTrace{}, err
 	}
-	trace := got.(TTrace)
-	ftrace := filterTrace(trace)
-	vtrace := virtualIdxTrace(ftrace)
+	trace := got
+	vtrace := virtualIdxTrace(trace)
 	return vtrace, nil
-}
-
-func filterTrace(t TTrace) TTrace {
-	var walk func(e TEntry) []TEntry
-	walk = func(e TEntry) []TEntry {
-		res := []TEntry{}
-		fcalls := []TEntry{}
-		for _, v := range e.Calls {
-			g := walk(v)
-			if len(g) != 0 {
-				fcalls = append(fcalls, g...)
-			}
-		}
-		if strings.HasPrefix(e.Detail.Name, "Rule ") ||
-			strings.HasPrefix(e.Detail.Name, "ZeroOrOneExpr ") ||
-			strings.HasPrefix(e.Detail.Name, "OneOrMoreExpr ") ||
-			strings.HasPrefix(e.Detail.Name, "ZeroOrMoreExpr ") {
-			e.Calls = fcalls
-			res = append(res, e)
-		} else {
-			res = fcalls
-		}
-		return res
-	}
-
-	res := []TEntry{}
-	for _, v := range t.Entries {
-		g := walk(v)
-		res = append(res, g...)
-	}
-	return TTrace{Entries: res}
 }
 
 func virtualIdxTrace(t TTrace) TTrace {
