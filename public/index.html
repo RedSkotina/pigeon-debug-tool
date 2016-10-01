@@ -265,7 +265,7 @@ turf
                 case 'object':
                     found = walk(e.calls);
                     if (found !== null) {
-                        if (e.ismatch || isTransientRule(e)) {
+                        //if (e.ismatch || isTransientRule(e)) {
                             // revert order
                             var x = found
                             while (x.caller !== null) {
@@ -274,7 +274,7 @@ turf
                             e['caller'] = null
                             x.caller = e
                             return found;
-                        }
+                        //}
                     }
                     
                     if (e.ismatch) {
