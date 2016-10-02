@@ -156,7 +156,7 @@ func runParser(source bytes.Buffer, test string) (bytes.Buffer, error) {
 		//runout.Write(runerr.Bytes())
 		return *bytes.NewBufferString("runParser(WriteFile): " + err.Error()), err
 	}
-	//defer os.Remove(tmpfilename)
+	defer os.Remove(tmpfilename)
 
 	//log.Printf("go run %v", tmpfilename)
 	var runout, runerr bytes.Buffer

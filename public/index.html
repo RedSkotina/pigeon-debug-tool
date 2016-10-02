@@ -29,12 +29,13 @@
                 </label>
                 <div id="richtext_grammar_container" class="richtext_container overflow_handler">
                     <div id="richtext_grammar" class="richtext">
+
 {
 func toIfaceSlice(v interface{}) []interface{} {
     if v == nil {
         return nil
     }
-    return v.([]interface{})
+    return v.([]interface{}) 
 }
 } 
 
@@ -48,10 +49,12 @@ LValue <- ArrayAccess / VarDefinition
 AssignmentOp <- [-+*/]? "=" 
 Initializer <- Expression
  
-VarNode <-  Slash? ( ("var" Slash VarNodeScope) / ("var" EOL+ INDENT (INDENTATION VarNodeScope)* DEDENT) ) / (Assignment EOL)
-VarNodeScope <- (Identifier Slash VarNodeType) / (Identifier EOL+ INDENT (INDENTATION VarNodeType)* DEDENT) / VarNodeType
-VarNodeType <- (Identifier Slash VarNodeStatement) / (Identifier EOL+ INDENT (INDENTATION VarNodeStatement)* DEDENT) / VarNodeStatement
+VarNode <-  Slash? ( ("var" Slash VarNodeTypeModifier) / ("var" EOL+ INDENT (INDENTATION VarNodeTypeModifier)* DEDENT) ) / VarNodeTypeModifier
+VarNodeTypeModifier <- ( VarTypeModifier Slash VarNodeTypeModifier) / (VarTypeModifier EOL+ INDENT (INDENTATION VarNodeTypeModifier)* DEDENT) / VarNodeType
+VarNodeType <- (Identifier Slash VarNodeType) / (Identifier EOL+ INDENT (INDENTATION VarNodeType)* DEDENT) / VarNodeStatement
 VarNodeStatement <- ( Assignment / ListVariable / SimpleVariable  ) EOL
+VarTypeModifier <- "const" / "global" / "tmp"
+
 SimpleVariable <- Identifier
 ListVariable <- Identifier ('[' _? Expression? _?']')+
 
@@ -63,7 +66,7 @@ FunctionNode <- Identifier '(' ArgumentsList? ')'  EOL+ INDENT (INDENTATION (Fun
 FunctionStatement <- VarNode / ReturnStatement / IfStatement / Assignment / OutputInstruction / InputInstruction 
                     / DelInstruction / SleepInstruction / SpawnInstruction / ForStatement / SwitchStatement / CallStatement / EOL
 
-ReturnStatement <- "return" _ (Expression)?
+ReturnStatement <- "return" (_ Expression)?
 CallStatement <- Expression
 DelInstruction <- "del" _ VarDefinition
 SleepInstruction <- "sleep" '(' _? Constant _? ')' LoopBlock
@@ -126,6 +129,7 @@ PrimaryExpression       <-
                         / v:Identifier
                         / v:VarDefinition
                         / v:VarAbsDefinition
+                        / ".."
                         / '.'
 
 Constant                <- PrimaryExpression
@@ -189,35 +193,308 @@ EOF <- !.
 
 INDENTATION <- spaces:"\t"* &{ return len(toIfaceSlice(spaces)) == state["Indentation"].(int), nil }
 INDENT <- #{ state["Indentation"] = state["Indentation"].(int) + 1; return nil }
-DEDENT <- #{ state["Indentation"] = state["Indentation"].(int) - 1; return nil }</div>
+DEDENT <- #{ state["Indentation"] = state["Indentation"].(int) - 1; return nil }
+</div>
                 </div>
             </div>
             <div id="test_container" class="flex-text scroll_y">
                 <label for="richtext_test_container">Test string</label>
                 <div id="richtext_test_container" class="richtext_container overflow_handler">
-                    <div id="richtext_test" class="richtext">/atom/var/smooth = 0
-/obj/screen/human/toggle/Click()
-	density = 1
+                    <div id="richtext_test" class="richtext">/obj/machinery/computer/communications/Topic(href, href_list)
+	var/x = 4
+	var/t/x =5
+	var/const/x = 2
+	var/const/global/x = 3
+	var/const/tmp/t/x = 3
+	var/const/t/x = 3
+	
+	if(..())
+		return
+	if (src.z > 2) 
+		usr << "<span class='boldannounce'>Unable to establish a connection</span>: \black You're too far away from the station!"
+		return
+	usr.set_machine(src)
 
-turf
-	floor
-		var/x = 1
-		icon = 1
-		proc/p1(x)
-			var/z = 2
-
-	wall
-		icon = 0
-		density = 1
-		opacity = 1
+	if(!href_list["operation"])
+		return
+	var/obj/item/weapon/circuitboard/computer/communications/CM = circuit
+	switch(href_list["operation"])
 		
-		secret_door
-			name = 0
-			density = 0
+		if("main")
+			src.state = STATE_DEFAULT
+		if("login")
+			var/mob/M = usr
+			var/obj/item/weapon/card/id/I = M.get_active_hand()
+			if (istype(I, /obj/item/device/pda))
+				var/obj/item/device/pda/pda = I
+				I = pda.id
+			if (I && istype(I))
+				if(src.check_access(I))
+					authenticated = 1
+					auth_id = "[I.registered_name] ([I.assignment])"
+					if((20 in I.access))
+						authenticated = 2
+				if(src.emagged)
+					authenticated = 2
+					auth_id = "Unknown"
+		if("logout")
+			authenticated = 0
 
-	window
-		icon = 1
-		density = 1
+		if("swipeidseclevel")
+			var/mob/M = usr
+			var/obj/item/weapon/card/id/I = M.get_active_hand()
+			if (istype(I, /obj/item/device/pda))
+				var/obj/item/device/pda/pda = I
+				I = pda.id
+			if (I && istype(I))
+				if(access_captain in I.access)
+					var/old_level = security_level
+					if(!tmp_alertlevel) tmp_alertlevel = 0
+					if(tmp_alertlevel < 0) tmp_alertlevel = 0
+					if(tmp_alertlevel > 1) tmp_alertlevel = 1 
+					set_security_level(tmp_alertlevel)
+					if(security_level != old_level)
+						
+						log_game("[key_name(usr)] has changed the security level to [get_security_level()].")
+						message_admins("[key_name_admin(usr)] has changed the security level to [get_security_level()].")
+						switch(security_level)
+							if(0)
+								feedback_inc("alert_comms_green",1)
+							if(1)
+								feedback_inc("alert_comms_blue",1)
+					tmp_alertlevel = 0
+				else:
+					usr << "<span class='warning'>You are not authorized to do this!</span>"
+					tmp_alertlevel = 0
+				state = STATE_DEFAULT
+			else
+				usr << "<span class='warning'>You need to swipe your ID!</span>"
+
+		if("announce")
+			if(src.authenticated==2 && !message_cooldown)
+				make_announcement(usr)
+			else if (src.authenticated==2 && message_cooldown)
+				usr << "Intercomms recharging. Please stand by."
+
+		if("crossserver")
+			if(authenticated==2)
+				if(CM.lastTimeUsed + 600 > world.time)
+					usr << "Arrays recycling.  Please stand by."
+					return
+				var/input = stripped_multiline_input(usr, "Please choose a message to transmit to an allied station.  Please be aware that this process is very expensive, and abuse will lead to... termination.", "Send a message to an allied station.", "")
+				if(!input || !(usr in view(1,src)))
+					return
+				send2otherserver("[station_name()]", input,"Comms_Console")
+				minor_announce(input, title = "Outgoing message to allied station")
+				log_say("[key_name(usr)] has sent a message to the other server: [input]")
+				message_admins("[key_name_admin(usr)] has sent a message to the other server.")
+				CM.lastTimeUsed = world.time
+
+		if("callshuttle")
+			src.state = STATE_DEFAULT
+			if(src.authenticated)
+				src.state = STATE_CALLSHUTTLE
+		if("callshuttle2")
+			if(src.authenticated)
+				SSshuttle.requestEvac(usr, href_list["call"])
+				if(SSshuttle.emergency.timer)
+					post_status("shuttle")
+			src.state = STATE_DEFAULT
+		if("cancelshuttle")
+			src.state = STATE_DEFAULT
+			if(src.authenticated)
+				src.state = STATE_CANCELSHUTTLE
+		if("cancelshuttle2")
+			if(src.authenticated)
+				SSshuttle.cancelEvac(usr)
+			src.state = STATE_DEFAULT
+		if("messagelist")
+			src.currmsg = 0
+			src.state = STATE_MESSAGELIST
+		if("viewmessage")
+			src.state = STATE_VIEWMESSAGE
+			if (!src.currmsg)
+				if(href_list["message-num"])
+					src.currmsg = text2num(href_list["message-num"])
+				else
+					src.state = STATE_MESSAGELIST
+		if("delmessage")
+			src.state = (src.currmsg) ? STATE_DELMESSAGE : STATE_MESSAGELIST
+		if("delmessage2")
+			if(src.authenticated)
+				if(src.currmsg)
+					var/title = src.messagetitle[src.currmsg]
+					var/text  = src.messagetext[src.currmsg]
+					src.messagetitle.Remove(title)
+					src.messagetext.Remove(text)
+					if(src.currmsg == src.aicurrmsg)
+						src.aicurrmsg = 0
+					src.currmsg = 0
+				src.state = STATE_MESSAGELIST
+			else
+				src.state = STATE_VIEWMESSAGE
+		if("status")
+			src.state = STATE_STATUSDISPLAY
+
+		if("securitylevel")
+			src.tmp_alertlevel = text2num( href_list["newalertlevel"] )
+			if(!tmp_alertlevel) tmp_alertlevel = 0
+			state = STATE_CONFIRM_LEVEL
+		if("changeseclevel")
+			state = STATE_ALERT_LEVEL
+
+		if("emergencyaccess")
+			state = STATE_TOGGLE_EMERGENCY
+		if("enableemergency")
+			make_maint_all_access()
+			log_game("[key_name(usr)] enabled emergency maintenance access.")
+			message_admins("[key_name_admin(usr)] enabled emergency maintenance access.")
+			src.state = STATE_DEFAULT
+		if("disableemergency")
+			revoke_maint_all_access()
+			log_game("[key_name(usr)] disabled emergency maintenance access.")
+			message_admins("[key_name_admin(usr)] disabled emergency maintenance access.")
+			src.state = STATE_DEFAULT
+
+		
+		if("setstat")
+			switch(href_list["statdisp"])
+				if("message")
+					post_status("message", stat_msg1, stat_msg2)
+				if("alert")
+					post_status("alert", href_list["alert"])
+				else
+					post_status(href_list["statdisp"])
+
+		if("setmsg1")
+			stat_msg1 = reject_bad_text(input("Line 1", "Enter Message Text", stat_msg1) as text|null, 40)
+			src.updateDialog()
+		if("setmsg2")
+			stat_msg2 = reject_bad_text(input("Line 2", "Enter Message Text", stat_msg2) as text|null, 40)
+			src.updateDialog()
+
+		
+		if("MessageCentcomm")
+			if(src.authenticated==2)
+				if(CM.lastTimeUsed + 600 > world.time)
+					usr << "Arrays recycling.  Please stand by."
+					return
+				var/input = stripped_input(usr, "Please choose a message to transmit to Centcom via quantum entanglement.  Please be aware that this process is very expensive, and abuse will lead to... termination.  Transmission does not guarantee a response.", "Send a message to Centcomm.", "")
+				if(!input || !(usr in view(1,src)))
+					return
+				Centcomm_announce(input, usr)
+				usr << "Message transmitted."
+				log_say("[key_name(usr)] has made a Centcom announcement: [input]")
+				CM.lastTimeUsed = world.time
+
+
+		
+		if("MessageSyndicate")
+			if((src.authenticated==2) && (src.emagged))
+				if(CM.lastTimeUsed + 600 > world.time)
+					usr << "Arrays recycling.  Please stand by."
+					return
+				var/input = stripped_input(usr, "Please choose a message to transmit to \[ABNORMAL ROUTING COORDINATES\] via quantum entanglement.  Please be aware that this process is very expensive, and abuse will lead to... termination. Transmission does not guarantee a response.", "Send a message to /??????/.", "")
+				if(!input || !(usr in view(1,src)))
+					return
+				Syndicate_announce(input, usr)
+				usr << "Message transmitted."
+				log_say("[key_name(usr)] has made a Syndicate announcement: [input]")
+				CM.lastTimeUsed = world.time
+
+		if("RestoreBackup")
+			usr << "Backup routing data restored!"
+			src.emagged = 0
+			src.updateDialog()
+
+		if("nukerequest") 
+			if(src.authenticated==2)
+				if(CM.lastTimeUsed + 600 > world.time)
+					usr << "Arrays recycling. Please stand by."
+					return
+				var/input = stripped_input(usr, "Please enter the reason for requesting the nuclear self-destruct codes. Misuse of the nuclear request system will not be tolerated under any circumstances.  Transmission does not guarantee a response.", "Self Destruct Code Request.","")
+				if(!input || !(usr in view(1,src)))
+					return
+				Nuke_request(input, usr)
+				usr << "Request sent."
+				log_say("[key_name(usr)] has requested the nuclear codes from Centcomm")
+				priority_announce("The codes for the on-station nuclear self-destruct have been requested by [usr]. Confirmation or denial of this request will be sent shortly.", "Nuclear Self Destruct Codes Requested",'sound/AI/commandreport.ogg')
+				CM.lastTimeUsed = world.time
+
+
+		
+		if("ai-main")
+			src.aicurrmsg = 0
+			src.aistate = STATE_DEFAULT
+		if("ai-callshuttle")
+			src.aistate = STATE_CALLSHUTTLE
+		if("ai-callshuttle2")
+			SSshuttle.requestEvac(usr, href_list["call"])
+			src.aistate = STATE_DEFAULT
+		if("ai-messagelist")
+			src.aicurrmsg = 0
+			src.aistate = STATE_MESSAGELIST
+		if("ai-viewmessage")
+			src.aistate = STATE_VIEWMESSAGE
+			if (!src.aicurrmsg)
+				if(href_list["message-num"])
+					src.aicurrmsg = text2num(href_list["message-num"])
+				else
+					src.aistate = STATE_MESSAGELIST
+		if("ai-delmessage")
+			src.aistate = (src.aicurrmsg) ? STATE_DELMESSAGE : STATE_MESSAGELIST
+		if("ai-delmessage2")
+			if(src.aicurrmsg)
+				var/title = src.messagetitle[src.aicurrmsg]
+				var/text  = src.messagetext[src.aicurrmsg]
+				src.messagetitle.Remove(title)
+				src.messagetext.Remove(text)
+				if(src.currmsg == src.aicurrmsg)
+					src.currmsg = 0
+				src.aicurrmsg = 0
+			src.aistate = STATE_MESSAGELIST
+		if("ai-status")
+			src.aistate = STATE_STATUSDISPLAY
+		if("ai-announce")
+			if(!ai_message_cooldown)
+				make_announcement(usr, 1)
+		if("ai-securitylevel")
+			src.tmp_alertlevel = text2num( href_list["newalertlevel"] )
+			if(!tmp_alertlevel) tmp_alertlevel = 0
+			var/old_level = security_level
+			if(!tmp_alertlevel) tmp_alertlevel = 0
+			if(tmp_alertlevel < 0) tmp_alertlevel = 0
+			if(tmp_alertlevel > 1) tmp_alertlevel = 1 
+			set_security_level(tmp_alertlevel)
+			if(security_level != old_level)
+				
+				log_game("[key_name(usr)] has changed the security level to [get_security_level()].")
+				message_admins("[key_name_admin(usr)] has changed the security level to [get_security_level()].")
+				switch(security_level)
+					if(0)
+						feedback_inc("alert_comms_green",1)
+					if(1)
+						feedback_inc("alert_comms_blue",1)
+			tmp_alertlevel = 0
+			src.aistate = STATE_DEFAULT
+		if("ai-changeseclevel")
+			src.aistate = STATE_ALERT_LEVEL
+
+		if("ai-emergencyaccess")
+			src.aistate = STATE_TOGGLE_EMERGENCY
+		if("ai-enableemergency")
+			make_maint_all_access()
+			log_game("[key_name(usr)] enabled emergency maintenance access.")
+			message_admins("[key_name_admin(usr)] enabled emergency maintenance access.")
+			src.aistate = STATE_DEFAULT
+		if("ai-disableemergency")
+			revoke_maint_all_access()
+			log_game("[key_name(usr)] disabled emergency maintenance access.")
+			message_admins("[key_name_admin(usr)] disabled emergency maintenance access.")
+			src.aistate = STATE_DEFAULT
+
+	src.updateUsrDialog()
+
 </div>
                 </div>
             </div>
@@ -260,6 +537,8 @@ turf
                 return true;
             return false;
         }
+        var getRootCaller = function(e) { var x = e;  while (x.caller !== null) { x = x.caller }; return x };
+
         var walk = function(e) {
             switch($.type(e)) {
                 case 'object':
@@ -267,14 +546,11 @@ turf
                     if (found !== null) {
                         //if (e.ismatch || isTransientRule(e)) {
                             // revert order
-                            var x = found
-                            while (x.caller !== null) {
-                                x = x.caller
-                            }
+                            var x = getRootCaller(found)
                             e['caller'] = null
                             x.caller = e
                             return found;
-                        //}
+                        //} 
                     }
                     
                     if (e.ismatch) {
@@ -286,11 +562,13 @@ turf
                     return null
                     
                 case 'array':
-                    var found = null
+                    var found = null;
                     $.each(e, function(k,v) {
                         found = walk(v)
                         if (found !== null) {
-                            return false; // break each
+                            var x = getRootCaller(found)
+                            if (x.ismatch || isTransientRule(x) )
+                                return false; // break each
                         }
                     });
                             
